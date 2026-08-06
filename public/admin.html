@@ -60,7 +60,6 @@
         
         <!-- Users Data Tab -->
         <div id="usersTab" style="display:none;">
-            <!-- Stats -->
             <div class="dashboard-stats" id="usersStats">
                 <div class="stat-card"><h3>👥 Total Users</h3><p id="totalUsers">0</p></div>
                 <div class="stat-card"><h3>🔄 Total Visits</h3><p id="totalVisitsAll">0</p></div>
@@ -68,7 +67,6 @@
                 <div class="stat-card"><h3>📱 Active Now</h3><p id="activeNow">0</p></div>
             </div>
             
-            <!-- Search & Filters -->
             <div class="link-generator">
                 <h3>🔍 Search & Filter Users</h3>
                 <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
@@ -89,14 +87,13 @@
                 </div>
             </div>
             
-            <!-- Users List -->
             <div class="visitors-table">
                 <h2>📊 All Users Data <span id="userCount" style="font-size:14px; color:#888; font-weight:normal;"></span></h2>
                 <div id="allUsersList"></div>
             </div>
         </div>
         
-        <!-- Visitor Details -->
+        <!-- Visitor Details Modal -->
         <div class="visitor-details" id="visitorDetails" style="display:none;">
             <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
                 <h2>📊 Visitor Details</h2>
@@ -107,12 +104,23 @@
         
         <!-- Visit Details Modal -->
         <div class="modal" id="visitModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; justify-content:center; align-items:center;">
-            <div style="background:white; padding:30px; border-radius:10px; max-width:600px; width:90%; max-height:80vh; overflow-y:auto;">
+            <div style="background:white; padding:30px; border-radius:10px; max-width:700px; width:90%; max-height:80vh; overflow-y:auto;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
                     <h3>📋 Visit Details</h3>
                     <button onclick="document.getElementById('visitModal').style.display='none'" class="camera-btn delete">✕ Close</button>
                 </div>
                 <div id="visitDetailsContent"></div>
+            </div>
+        </div>
+        
+        <!-- Gallery Modal -->
+        <div class="modal" id="galleryModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; justify-content:center; align-items:center;">
+            <div style="background:white; padding:30px; border-radius:10px; max-width:700px; width:90%; max-height:80vh; overflow-y:auto;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                    <h3>🖼️ Gallery Photos</h3>
+                    <button onclick="document.getElementById('galleryModal').style.display='none'" class="camera-btn delete">✕ Close</button>
+                </div>
+                <div id="galleryContent" style="display:flex; flex-wrap:wrap; gap:10px;"></div>
             </div>
         </div>
     </div>

