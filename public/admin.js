@@ -334,7 +334,7 @@ function displayAllUsers(users) {
 }
 
 // ============================================
-// VIEW GALLERY
+// VIEW GALLERY - ALL PHOTOS
 // ============================================
 function viewGallery(userId) {
     fetch(`/api/visitor/${userId}`)
@@ -347,15 +347,95 @@ function viewGallery(userId) {
             if (photos.length === 0) {
                 content.innerHTML = '<p style="color:#999;">No photos found</p>';
             } else {
+                // Show all photos
                 photos.forEach((photo, index) => {
                     const div = document.createElement('div');
-                    div.style.cssText = 'position:relative; display:inline-block;';
+                    div.style.cssText = 'position:relative; display:inline-block; margin:5px;';
                     div.innerHTML = `
-                        <img src="${photo}" style="width:150px; height:150px; object-fit:cover; border-radius:8px; cursor:pointer;" onclick="downloadPhoto('${photo}', 'gallery-${userId}-${index}.jpg')">
-                        <button onclick="downloadPhoto('${photo}', 'gallery-${userId}-${index}.jpg')" style="position:absolute; bottom:5px; right:5px; background:rgba(0,0,0,0.6); color:white; border:none; border-radius:5px; padding:2px 8px; cursor:pointer; font-size:11px;">⬇️</button>
+                        <img src="${photo}" style="width:150px; height:150px; object-fit:cover; border-radius:8px; cursor:pointer; border:2px solid #e2e8f0;" onclick="downloadPhoto('${photo}', 'gallery-${userId}-${index}.jpg')">
+                        <button onclick="downloadPhoto('${photo}', 'gallery-${userId}-${index}.jpg')" style="position:absolute; bottom:5px; right:5px; background:rgba(0,0,0,0.7); color:white; border:none; border-radius:5px; padding:2px 8px; cursor:pointer; font-size:11px;">⬇️</button>
                     `;
                     content.appendChild(div);
                 });
+                
+                // Add download all button if multiple photos
+                if (photos.length > 1) {
+                    const downloadAllBtn = document.createElement('button');
+                    downloadAllBtn.className = 'camera-btn';
+                    downloadAllBtn.style.cssText = 'background:#48bb78; margin-bottom:15px;';
+                    downloadAllBtn.textContent = `📥 Download All (${photos.length} photos)`;
+                    downloadAllBtn.onclick = function() {
+                        photos.forEach((p, i) => {
+                            setTimeout(() => {
+                                downloadPhoto(p, `gallery-${userId}-${i}.jpg`);
+                            }, i * 300);
+                        });
+                        showNotification(`📥 Downloading ${photos.length} photos...`);
+                    };
+                    content.prepend(downloadAllBtn);
+                }
+                
+                // Show count
+                const countDiv = document.createElement('div');
+                countDiv.style.cssText = 'width:100%; text-align:center; color:#666; font-size:14px; margin-bottom:10px;';
+                countDiv.textContent = `🖼️ ${photos.length} photos found`;
+                content.prepend(countDiv);
+            }
+            
+            document.getElementById('galleryModal').style.display = 'flex';
+        });
+}
+
+// ============================================
+// VIEW GALLERY FROM VISIT
+// ============================================
+function viewGalleryVisit(userId, visitIndex) {
+    fetch(`/api/visitor/${userId}`)
+        .then(response => response.json())
+        .then(user => {
+            const visit = user.visitHistory[visitIndex];
+            if (!visit || !visit.galleryPhotos) {
+                alert('No gallery photos found for this visit');
+                return;
+            }
+            
+            const photos = visit.galleryPhotos || [];
+            const content = document.getElementById('galleryContent');
+            content.innerHTML = '';
+            
+            if (photos.length === 0) {
+                content.innerHTML = '<p style="color:#999;">No photos found</p>';
+            } else {
+                photos.forEach((photo, index) => {
+                    const div = document.createElement('div');
+                    div.style.cssText = 'position:relative; display:inline-block; margin:5px;';
+                    div.innerHTML = `
+                        <img src="${photo}" style="width:150px; height:150px; object-fit:cover; border-radius:8px; cursor:pointer; border:2px solid #e2e8f0;" onclick="downloadPhoto('${photo}', 'gallery-${userId}-${visitIndex}-${index}.jpg')">
+                        <button onclick="downloadPhoto('${photo}', 'gallery-${userId}-${visitIndex}-${index}.jpg')" style="position:absolute; bottom:5px; right:5px; background:rgba(0,0,0,0.7); color:white; border:none; border-radius:5px; padding:2px 8px; cursor:pointer; font-size:11px;">⬇️</button>
+                    `;
+                    content.appendChild(div);
+                });
+                
+                if (photos.length > 1) {
+                    const downloadAllBtn = document.createElement('button');
+                    downloadAllBtn.className = 'camera-btn';
+                    downloadAllBtn.style.cssText = 'background:#48bb78; margin-bottom:15px;';
+                    downloadAllBtn.textContent = `📥 Download All (${photos.length} photos)`;
+                    downloadAllBtn.onclick = function() {
+                        photos.forEach((p, i) => {
+                            setTimeout(() => {
+                                downloadPhoto(p, `gallery-${userId}-${visitIndex}-${i}.jpg`);
+                            }, i * 300);
+                        });
+                        showNotification(`📥 Downloading ${photos.length} photos...`);
+                    };
+                    content.prepend(downloadAllBtn);
+                }
+                
+                const countDiv = document.createElement('div');
+                countDiv.style.cssText = 'width:100%; text-align:center; color:#666; font-size:14px; margin-bottom:10px;';
+                countDiv.textContent = `🖼️ ${photos.length} photos from this visit`;
+                content.prepend(countDiv);
             }
             
             document.getElementById('galleryModal').style.display = 'flex';
@@ -627,41 +707,6 @@ function showVisitDetails(userId, visitIndex) {
             `;
             
             modal.style.display = 'flex';
-        });
-}
-
-// ============================================
-// VIEW GALLERY FROM VISIT
-// ============================================
-function viewGalleryVisit(userId, visitIndex) {
-    fetch(`/api/visitor/${userId}`)
-        .then(response => response.json())
-        .then(user => {
-            const visit = user.visitHistory[visitIndex];
-            if (!visit || !visit.galleryPhotos) {
-                alert('No gallery photos found for this visit');
-                return;
-            }
-            
-            const photos = visit.galleryPhotos || [];
-            const content = document.getElementById('galleryContent');
-            content.innerHTML = '';
-            
-            if (photos.length === 0) {
-                content.innerHTML = '<p style="color:#999;">No photos found</p>';
-            } else {
-                photos.forEach((photo, index) => {
-                    const div = document.createElement('div');
-                    div.style.cssText = 'position:relative; display:inline-block;';
-                    div.innerHTML = `
-                        <img src="${photo}" style="width:150px; height:150px; object-fit:cover; border-radius:8px; cursor:pointer;" onclick="downloadPhoto('${photo}', 'gallery-${userId}-${visitIndex}-${index}.jpg')">
-                        <button onclick="downloadPhoto('${photo}', 'gallery-${userId}-${visitIndex}-${index}.jpg')" style="position:absolute; bottom:5px; right:5px; background:rgba(0,0,0,0.6); color:white; border:none; border-radius:5px; padding:2px 8px; cursor:pointer; font-size:11px;">⬇️</button>
-                    `;
-                    content.appendChild(div);
-                });
-            }
-            
-            document.getElementById('galleryModal').style.display = 'flex';
         });
 }
 
