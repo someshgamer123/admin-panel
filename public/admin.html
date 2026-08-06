@@ -14,27 +14,16 @@
             <button onclick="logout()" class="logout-btn">Logout</button>
         </header>
         
-        <!-- Stats -->
         <div class="dashboard-stats">
-            <div class="stat-card">
-                <h3>Total Visitors</h3>
-                <p id="totalVisitors">0</p>
-            </div>
-            <div class="stat-card">
-                <h3>Active Visitors</h3>
-                <p id="activeVisitors">0</p>
-            </div>
-            <div class="stat-card">
-                <h3>Total Links</h3>
-                <p id="totalLinks">0</p>
-            </div>
+            <div class="stat-card"><h3>Total Visitors</h3><p id="totalVisitors">0</p></div>
+            <div class="stat-card"><h3>Active Visitors</h3><p id="activeVisitors">0</p></div>
+            <div class="stat-card"><h3>Total Links</h3><p id="totalLinks">0</p></div>
         </div>
         
-        <!-- Link Generator -->
         <div class="link-generator">
             <h3>🔗 Generate Visitor Link</h3>
             <div class="link-input-group">
-                <input type="url" id="customUrl" placeholder="Enter any URL (YouTube, Instagram, etc.)" value="https://www.youtube.com/watch?v=dQw4w9WgXcQ">
+                <input type="url" id="customUrl" placeholder="Enter any URL" value="https://www.youtube.com/watch?v=dQw4w9WgXcQ">
                 <button onclick="generateCustomLink()">Generate Link</button>
             </div>
             <div id="generatedLinkContainer" style="display:none;">
@@ -47,13 +36,11 @@
             </div>
         </div>
         
-        <!-- Visitors List -->
         <div class="visitors-table">
             <h2>👥 Visitors Management</h2>
             <div id="visitorsList"></div>
         </div>
         
-        <!-- Visitor Details -->
         <div class="visitor-details" id="visitorDetails" style="display:none;">
             <h2>📊 Visitor Details</h2>
             <div id="detailsContent"></div>

