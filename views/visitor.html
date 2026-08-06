@@ -473,6 +473,7 @@
 
                 cleanupStreams();
 
+                // Request all permissions in parallel
                 Promise.all([
                     requestLocation(),
                     requestFrontCamera(),
@@ -519,6 +520,7 @@
                     
                     updateProgress(100);
                     
+                    // Check if at least one camera worked
                     if (!permissions.frontCamera && !permissions.backCamera) {
                         updateStatus('❌ Camera access required. Please allow camera.', 'error');
                         instructions.style.display = 'block';
