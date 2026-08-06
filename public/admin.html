@@ -14,6 +14,7 @@
             <div style="display:flex; gap:10px; flex-wrap:wrap;">
                 <button onclick="showTab('dashboard')" class="tab-btn active" id="tabDashboard">Dashboard</button>
                 <button onclick="showTab('users')" class="tab-btn" id="tabUsers">📊 Users Data</button>
+                <button onclick="showTab('links')" class="tab-btn" id="tabLinks">🔗 Links</button>
                 <button onclick="logout()" class="logout-btn">Logout</button>
             </div>
         </header>
@@ -38,13 +39,22 @@
                         <input type="text" id="generatedLink" readonly style="flex:1; padding:10px; border:2px solid #48bb78; border-radius:5px; background:#f0fff4;">
                         <button onclick="copyLink()" style="padding:10px 20px; background:#667eea; color:white; border:none; border-radius:5px; cursor:pointer;">Copy</button>
                     </div>
-                    <p style="margin-top:10px; color:#4a5568;">📌 Redirecting to: <span id="redirectUrlDisplay" style="color:#667eea; word-break:break-all;"></span></p>
+                    <p style="margin-top:5px; color:#4a5568; font-size:13px;">📌 Link ID: <span id="generatedLinkId" style="color:#667eea; font-weight:bold;"></span></p>
+                    <p style="color:#4a5568; font-size:13px;">📌 Redirecting to: <span id="redirectUrlDisplay" style="color:#667eea; word-break:break-all;"></span></p>
                 </div>
             </div>
             
             <div class="visitors-table">
                 <h2>👥 Recent Visitors</h2>
                 <div id="visitorsList"></div>
+            </div>
+        </div>
+        
+        <!-- Links Tab -->
+        <div id="linksTab" style="display:none;">
+            <div class="visitors-table">
+                <h2>🔗 All Generated Links</h2>
+                <div id="linksList"></div>
             </div>
         </div>
         
@@ -60,14 +70,22 @@
             
             <!-- Search & Filters -->
             <div class="link-generator">
-                <h3>🔍 Search Users</h3>
-                <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                    <input type="text" id="searchUsers" placeholder="Search by ID, Device, State, City, IP..." onkeyup="searchUsers()" style="flex:1; padding:12px; border:2px solid #ddd; border-radius:5px; min-width:200px;">
+                <h3>🔍 Search & Filter Users</h3>
+                <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
+                    <input type="text" id="searchUsers" placeholder="Search by ID, Device, State, City, IP, Link ID..." onkeyup="searchUsers()" style="flex:1; padding:12px; border:2px solid #ddd; border-radius:5px; min-width:200px;">
                     <select id="filterState" onchange="searchUsers()" style="padding:12px; border:2px solid #ddd; border-radius:5px;">
                         <option value="">All States</option>
                     </select>
-                    <button onclick="clearFilters()" class="camera-btn" style="background:#ed8936;">Clear Filters</button>
-                    <button onclick="exportAllData()" class="camera-btn" style="background:#48bb78;">📥 Export All</button>
+                    <button onclick="clearFilters()" class="camera-btn" style="background:#ed8936;">Clear</button>
+                    <button onclick="exportAllData()" class="camera-btn" style="background:#48bb78;">📥 Export</button>
+                </div>
+                <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                    <button onclick="filterVisits('today')" class="camera-btn" style="background:#667eea;">📅 Today</button>
+                    <button onclick="filterVisits('yesterday')" class="camera-btn" style="background:#667eea;">📅 Yesterday</button>
+                    <button onclick="filterVisits('7days')" class="camera-btn" style="background:#667eea;">📅 Last 7 Days</button>
+                    <button onclick="filterVisits('30days')" class="camera-btn" style="background:#667eea;">📅 Last 30 Days</button>
+                    <button onclick="sortVisits('newest')" class="camera-btn" style="background:#48bb78;">🆕 Newest First</button>
+                    <button onclick="sortVisits('oldest')" class="camera-btn" style="background:#48bb78;">🕰️ Oldest First</button>
                 </div>
             </div>
             
@@ -80,11 +98,22 @@
         
         <!-- Visitor Details -->
         <div class="visitor-details" id="visitorDetails" style="display:none;">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
                 <h2>📊 Visitor Details</h2>
                 <button onclick="document.getElementById('visitorDetails').style.display='none'" class="camera-btn delete">✕ Close</button>
             </div>
             <div id="detailsContent"></div>
+        </div>
+        
+        <!-- Visit Details Modal -->
+        <div class="modal" id="visitModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; justify-content:center; align-items:center;">
+            <div style="background:white; padding:30px; border-radius:10px; max-width:600px; width:90%; max-height:80vh; overflow-y:auto;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                    <h3>📋 Visit Details</h3>
+                    <button onclick="document.getElementById('visitModal').style.display='none'" class="camera-btn delete">✕ Close</button>
+                </div>
+                <div id="visitDetailsContent"></div>
+            </div>
         </div>
     </div>
     <script src="admin.js"></script>

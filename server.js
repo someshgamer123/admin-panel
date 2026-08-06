@@ -96,6 +96,23 @@ app.get('/api/users-data', (req, res) => {
     res.json(users);
 });
 
+// Get all links with visit counts
+app.get('/api/links', (req, res) => {
+    if (!req.session.admin) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const users = readUsers();
+    const links = users.map(u => ({
+        linkId: u.linkId || u.id.substring(0, 8),
+        link: u.link,
+        redirectUrl: u.redirectUrl,
+        createdAt: u.createdAt,
+        totalVisits: u.totalVisits || 0,
+        lastVisit: u.lastVisit
+    }));
+    res.json(links);
+});
+
 // Get specific visitor
 app.get('/api/visitor/:id', (req, res) => {
     const users = readUsers();
@@ -115,10 +132,12 @@ app.post('/generate-custom-link', (req, res) => {
     
     const { redirectUrl } = req.body;
     const visitorId = uuidv4();
+    const linkId = uuidv4().substring(0, 8);
     const link = `${req.protocol}://${req.get('host')}/visitor/${visitorId}`;
     
     const visitorInfo = {
         id: visitorId,
+        linkId: linkId,
         link: link,
         redirectUrl: redirectUrl || 'https://www.google.com',
         createdAt: new Date().toISOString(),
@@ -142,7 +161,13 @@ app.post('/generate-custom-link', (req, res) => {
     users.push(visitorInfo);
     writeUsers(users);
     
-    res.json({ success: true, link: link, visitorId: visitorId, redirectUrl: visitorInfo.redirectUrl });
+    res.json({ 
+        success: true, 
+        link: link, 
+        linkId: linkId,
+        visitorId: visitorId, 
+        redirectUrl: visitorInfo.redirectUrl 
+    });
 });
 
 // Delete visitor
