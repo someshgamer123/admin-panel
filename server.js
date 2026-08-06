@@ -1,3 +1,6 @@
+// ==========================================
+// 1. IMPORTS
+// ==========================================
 const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
@@ -8,6 +11,9 @@ const bodyParser = require('body-parser');
 const session = require('express-session');
 const { v4: uuidv4 } = require('uuid');
 
+// ==========================================
+// 2. APP INITIALIZATION
+// ==========================================
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server, {
@@ -17,17 +23,23 @@ const io = socketIo(server, {
     }
 });
 
+// ==========================================
+// 3. MIDDLEWARE
+// ==========================================
 app.use(cors());
 app.use(bodyParser.json({ limit: '50mb' }));
 app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
 app.use(express.static('public'));
 app.use(session({
-    secret: 'your-secret-key',
+    secret: process.env.SESSION_SECRET || 'your-secret-key',
     resave: false,
     saveUninitialized: true,
     cookie: { secure: false }
 }));
 
+// ==========================================
+// 4. DATABASE SETUP
+// ==========================================
 const DB_PATH = path.join(__dirname, 'database');
 const USERS_FILE = path.join(DB_PATH, 'users.json');
 
@@ -50,6 +62,10 @@ const readUsers = () => {
 const writeUsers = (users) => {
     fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
 };
+
+// ==========================================
+// 5. ROUTES
+// ==========================================
 
 // Admin Login
 app.post('/admin-login', (req, res) => {
@@ -132,6 +148,16 @@ app.delete('/api/visitor/:id', (req, res) => {
     res.json({ success: true });
 });
 
+// Clear all visitors data
+app.delete('/api/clear-all', (req, res) => {
+    if (!req.session.admin) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
+    writeUsers([]);
+    res.json({ success: true });
+});
+
 // Visitor redirect fallback
 app.get('/api/visitor-redirect/:id', (req, res) => {
     const users = readUsers();
@@ -157,7 +183,7 @@ app.get('/visitor/:id', (req, res) => {
 });
 
 // ==========================================
-// SOCKET.IO
+// 6. SOCKET.IO
 // ==========================================
 const connectedClients = new Map();
 
@@ -258,6 +284,9 @@ io.on('connection', (socket) => {
     });
 });
 
+// ==========================================
+// 7. SERVER START
+// ==========================================
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
