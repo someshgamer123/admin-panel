@@ -1,0 +1,14 @@
+[
+  {
+    "id": "1579fec9-c8c8-490f-be3b-0dab596c636d",
+    "link": "http://localhost:3000/visitor/1579fec9-c8c8-490f-be3b-0dab596c636d",
+    "createdAt": "2026-08-06T03:45:17.322Z",
+    "status": "pending"
+  },
+  {
+    "id": "a5e36f5f-4c50-476f-9b6c-91a2783a80a2",
+    "link": "http://localhost:3000/visitor/a5e36f5f-4c50-476f-9b6c-91a2783a80a2",
+    "createdAt": "2026-08-06T03:45:18.818Z",
+    "status": "pending"
+  }
+]

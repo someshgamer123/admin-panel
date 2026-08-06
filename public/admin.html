@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.6.1/socket.io.js"></script>
+</head>
+<body>
+    <div class="admin-container">
+        <header>
+            <h1>Admin Dashboard</h1>
+            <button onclick="logout()" class="logout-btn">Logout</button>
+        </header>
+        
+        <div class="dashboard-stats">
+            <div class="stat-card">
+                <h3>Total Visitors</h3>
+                <p id="totalVisitors">0</p>
+            </div>
+            <div class="stat-card">
+                <h3>Active Visitors</h3>
+                <p id="activeVisitors">0</p>
+            </div>
+            <div class="stat-card">
+                <h3>Total Links Generated</h3>
+                <p id="totalLinks">0</p>
+            </div>
+        </div>
+        
+        <div class="admin-controls">
+            <button onclick="generateLink()" class="generate-btn">Generate New Link</button>
+            <div id="linkDisplay" style="display:none;">
+                <p>Share this link:</p>
+                <input type="text" id="generatedLink" readonly>
+                <button onclick="copyLink()">Copy Link</button>
+            </div>
+        </div>
+        
+        <div class="visitors-table">
+            <h2>Visitors Management</h2>
+            <div id="visitorsList"></div>
+        </div>
+        
+        <div class="visitor-details" id="visitorDetails" style="display:none;">
+            <h2>Visitor Details</h2>
+            <div id="detailsContent"></div>
+        </div>
+    </div>
+    <script src="admin.js"></script>
+</body>
+</html>
