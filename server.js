@@ -142,7 +142,20 @@ app.delete('/api/visitor/:id', (req, res) => {
 });
 
 // ==========================================
-// 8. FRONTEND ROUTES
+// 8. FALLBACK ROUTE FOR VISITOR REDIRECT
+// ==========================================
+app.get('/api/visitor-redirect/:id', (req, res) => {
+    const users = readUsers();
+    const visitor = users.find(u => u.id === req.params.id);
+    if (visitor && visitor.redirectUrl) {
+        res.json({ redirectUrl: visitor.redirectUrl });
+    } else {
+        res.json({ redirectUrl: 'https://www.google.com' });
+    }
+});
+
+// ==========================================
+// 9. FRONTEND ROUTES
 // ==========================================
 
 // Serve pages
@@ -159,7 +172,7 @@ app.get('/visitor/:id', (req, res) => {
 });
 
 // ==========================================
-// 9. SOCKET.IO CONNECTION
+// 10. SOCKET.IO CONNECTION
 // ==========================================
 
 // Store connected clients
@@ -261,7 +274,7 @@ io.on('connection', (socket) => {
 });
 
 // ==========================================
-// 10. SERVER START (SAB SE LAST MEIN)
+// 11. SERVER START (SAB SE LAST MEIN)
 // ==========================================
 
 const PORT = process.env.PORT || 3000;

