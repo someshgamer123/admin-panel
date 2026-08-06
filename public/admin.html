@@ -9,11 +9,12 @@
 </head>
 <body>
     <div class="admin-container">
+        <!-- Header - Glassmorphism Style -->
         <header>
             <h1>🚀 Admin Dashboard</h1>
             <div style="display:flex; gap:10px; flex-wrap:wrap;">
-                <button onclick="showTab('dashboard')" class="tab-btn active" id="tabDashboard">Dashboard</button>
-                <button onclick="showTab('users')" class="tab-btn" id="tabUsers">📊 Users Data</button>
+                <button onclick="showTab('dashboard')" class="tab-btn active" id="tabDashboard">📊 Dashboard</button>
+                <button onclick="showTab('users')" class="tab-btn" id="tabUsers">👥 Users Data</button>
                 <button onclick="showTab('links')" class="tab-btn" id="tabLinks">🔗 Links</button>
                 <button onclick="logout()" class="logout-btn">Logout</button>
             </div>
@@ -21,12 +22,14 @@
         
         <!-- Dashboard Tab -->
         <div id="dashboardTab">
+            <!-- Stats Cards -->
             <div class="dashboard-stats">
-                <div class="stat-card"><h3>Total Visitors</h3><p id="totalVisitors">0</p></div>
-                <div class="stat-card"><h3>Active Visitors</h3><p id="activeVisitors">0</p></div>
-                <div class="stat-card"><h3>Total Links</h3><p id="totalLinks">0</p></div>
+                <div class="stat-card"><h3>👥 Total Visitors</h3><p id="totalVisitors">0</p></div>
+                <div class="stat-card"><h3>🟢 Active Visitors</h3><p id="activeVisitors">0</p></div>
+                <div class="stat-card"><h3>🔗 Total Links</h3><p id="totalLinks">0</p></div>
             </div>
             
+            <!-- Link Generator -->
             <div class="link-generator">
                 <h3>🔗 Generate Visitor Link</h3>
                 <div class="link-input-group">
@@ -44,6 +47,7 @@
                 </div>
             </div>
             
+            <!-- Recent Visitors -->
             <div class="visitors-table">
                 <h2>👥 Recent Visitors</h2>
                 <div id="visitorsList"></div>
@@ -60,6 +64,7 @@
         
         <!-- Users Data Tab -->
         <div id="usersTab" style="display:none;">
+            <!-- Stats -->
             <div class="dashboard-stats" id="usersStats">
                 <div class="stat-card"><h3>👥 Total Users</h3><p id="totalUsers">0</p></div>
                 <div class="stat-card"><h3>🔄 Total Visits</h3><p id="totalVisitsAll">0</p></div>
@@ -67,6 +72,7 @@
                 <div class="stat-card"><h3>📱 Active Now</h3><p id="activeNow">0</p></div>
             </div>
             
+            <!-- Search & Filters -->
             <div class="link-generator">
                 <h3>🔍 Search & Filter Users</h3>
                 <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
@@ -87,6 +93,7 @@
                 </div>
             </div>
             
+            <!-- All Users List -->
             <div class="visitors-table">
                 <h2>📊 All Users Data <span id="userCount" style="font-size:14px; color:#888; font-weight:normal;"></span></h2>
                 <div id="allUsersList"></div>
@@ -110,17 +117,6 @@
                     <button onclick="document.getElementById('visitModal').style.display='none'" class="camera-btn delete">✕ Close</button>
                 </div>
                 <div id="visitDetailsContent"></div>
-            </div>
-        </div>
-        
-        <!-- Gallery Modal -->
-        <div class="modal" id="galleryModal" style="display:none;">
-            <div class="modal-content">
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-                    <h3>🖼️ Gallery</h3>
-                    <button onclick="document.getElementById('galleryModal').style.display='none'" class="camera-btn delete">✕ Close</button>
-                </div>
-                <div id="galleryContent"></div>
             </div>
         </div>
     </div>
