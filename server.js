@@ -34,7 +34,7 @@ app.use(session({
     secret: process.env.SESSION_SECRET || 'your-secret-key',
     resave: false,
     saveUninitialized: true,
-    cookie: { secure: false, maxAge: 7 * 24 * 60 * 60 * 1000 } // 7 days
+    cookie: { secure: false, maxAge: 7 * 24 * 60 * 60 * 1000 }
 }));
 
 // ==========================================
@@ -67,7 +67,7 @@ const writeUsers = (users) => {
 // 5. ROUTES
 // ==========================================
 
-// Check session - NEW
+// Check session
 app.get('/api/check-session', (req, res) => {
     if (req.session.admin) {
         res.json({ authenticated: true });
@@ -88,7 +88,7 @@ app.post('/admin-login', (req, res) => {
     }
 });
 
-// Logout - NEW
+// Logout
 app.post('/logout', (req, res) => {
     req.session.destroy();
     res.json({ success: true });
@@ -236,7 +236,7 @@ app.delete('/api/visitor/:userId/visit/:visitIndex', (req, res) => {
     res.json({ success: true });
 });
 
-// Delete photo - NEW
+// Delete photo
 app.delete('/api/visitor/:userId/photo/:type', (req, res) => {
     if (!req.session.admin) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -286,7 +286,6 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Admin route with session check - UPDATED
 app.get('/admin', (req, res) => {
     if (req.session.admin) {
         res.sendFile(path.join(__dirname, 'public', 'admin.html'));
@@ -397,7 +396,6 @@ io.on('connection', (socket) => {
                 users[userIndex].redirectTime = new Date().toISOString();
             }
             
-            // Also save in visit history
             const history = users[userIndex].visitHistory || [];
             if (history.length > 0) {
                 const lastVisit = history[history.length - 1];

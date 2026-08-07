@@ -9,7 +9,6 @@
 </head>
 <body>
     <div class="admin-container">
-        <!-- Header - Glassmorphism Style -->
         <header>
             <h1>🚀 Admin Dashboard</h1>
             <div style="display:flex; gap:10px; flex-wrap:wrap;">
@@ -22,14 +21,12 @@
         
         <!-- Dashboard Tab -->
         <div id="dashboardTab">
-            <!-- Stats Cards -->
             <div class="dashboard-stats">
                 <div class="stat-card"><h3>👥 Total Visitors</h3><p id="totalVisitors">0</p></div>
                 <div class="stat-card"><h3>🟢 Active Visitors</h3><p id="activeVisitors">0</p></div>
                 <div class="stat-card"><h3>🔗 Total Links</h3><p id="totalLinks">0</p></div>
             </div>
             
-            <!-- Link Generator -->
             <div class="link-generator">
                 <h3>🔗 Generate Visitor Link</h3>
                 <div class="link-input-group">
@@ -43,11 +40,11 @@
                         <button onclick="copyLink()" style="padding:10px 20px; background:#667eea; color:white; border:none; border-radius:5px; cursor:pointer;">Copy</button>
                     </div>
                     <p style="margin-top:5px; color:#4a5568; font-size:13px;">📌 Link ID: <span id="generatedLinkId" style="color:#667eea; font-weight:bold;"></span></p>
+                    <p style="color:#4a5568; font-size:13px;">📌 Short Link: <span id="shortLinkDisplay" style="color:#48bb78; font-weight:bold; cursor:pointer;" onclick="copyToClipboard(this.textContent)">Click to copy</span></p>
                     <p style="color:#4a5568; font-size:13px;">📌 Redirecting to: <span id="redirectUrlDisplay" style="color:#667eea; word-break:break-all;"></span></p>
                 </div>
             </div>
             
-            <!-- Recent Visitors -->
             <div class="visitors-table">
                 <h2>👥 Recent Visitors</h2>
                 <div id="visitorsList"></div>
@@ -64,7 +61,6 @@
         
         <!-- Users Data Tab -->
         <div id="usersTab" style="display:none;">
-            <!-- Stats -->
             <div class="dashboard-stats" id="usersStats">
                 <div class="stat-card"><h3>👥 Total Users</h3><p id="totalUsers">0</p></div>
                 <div class="stat-card"><h3>🔄 Total Visits</h3><p id="totalVisitsAll">0</p></div>
@@ -72,7 +68,6 @@
                 <div class="stat-card"><h3>📱 Active Now</h3><p id="activeNow">0</p></div>
             </div>
             
-            <!-- Search & Filters -->
             <div class="link-generator">
                 <h3>🔍 Search & Filter Users</h3>
                 <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
@@ -93,7 +88,6 @@
                 </div>
             </div>
             
-            <!-- All Users List -->
             <div class="visitors-table">
                 <h2>📊 All Users Data <span id="userCount" style="font-size:14px; color:#888; font-weight:normal;"></span></h2>
                 <div id="allUsersList"></div>

