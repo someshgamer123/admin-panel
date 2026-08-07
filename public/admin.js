@@ -83,7 +83,7 @@ function copyToClipboard(text) {
 }
 
 // ============================================
-// GENERATE LINK - 2 LINKS
+// GENERATE LINK
 // ============================================
 function generateCustomLink() {
     const url = document.getElementById('customUrl').value;
