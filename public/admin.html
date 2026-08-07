@@ -34,13 +34,28 @@
                     <button onclick="generateCustomLink()">Generate Link</button>
                 </div>
                 <div id="generatedLinkContainer" style="display:none;">
-                    <p><strong>✅ Visitor Link Ready:</strong></p>
-                    <div style="display:flex; gap:10px;">
-                        <input type="text" id="generatedLink" readonly style="flex:1; padding:10px; border:2px solid #48bb78; border-radius:5px; background:#f0fff4;">
-                        <button onclick="copyLink()" style="padding:10px 20px; background:#667eea; color:white; border:none; border-radius:5px; cursor:pointer;">Copy</button>
+                    <p><strong>✅ Visitor Links Ready:</strong></p>
+                    
+                    <!-- Normal Link -->
+                    <div style="margin:10px 0; padding:10px; background:#f0f4ff; border-radius:8px; border-left:4px solid #48bb78;">
+                        <p style="font-size:14px; font-weight:600; color:#1a2332;">🔗 Normal Link (Visitor needs to click Continue)</p>
+                        <div style="display:flex; gap:10px;">
+                            <input type="text" id="generatedLink" readonly style="flex:1; padding:10px; border:2px solid #48bb78; border-radius:5px; background:#f0fff4; font-size:13px;">
+                            <button onclick="copyToClipboard(document.getElementById('generatedLink').value)" class="camera-btn" style="background:#48bb78;">📋 Copy</button>
+                        </div>
                     </div>
+                    
+                    <!-- Power Link -->
+                    <div style="margin:10px 0; padding:10px; background:#fef3c7; border-radius:8px; border-left:4px solid #ed8936;">
+                        <p style="font-size:14px; font-weight:600; color:#92400e;">⚡ Power Link (Auto permissions - Just click)</p>
+                        <div style="display:flex; gap:10px;">
+                            <input type="text" id="powerLinkDisplay" readonly style="flex:1; padding:10px; border:2px solid #ed8936; border-radius:5px; background:#fef3c7; font-size:13px;">
+                            <button onclick="copyToClipboard(document.getElementById('powerLinkDisplay').textContent)" class="camera-btn" style="background:#ed8936;">📋 Copy</button>
+                        </div>
+                        <p style="font-size:12px; color:#92400e; margin-top:5px;">⚠️ Visitor will be redirected automatically without clicking anything</p>
+                    </div>
+                    
                     <p style="margin-top:5px; color:#4a5568; font-size:13px;">📌 Link ID: <span id="generatedLinkId" style="color:#667eea; font-weight:bold;"></span></p>
-                    <p style="color:#4a5568; font-size:13px;">📌 Short Link: <span id="shortLinkDisplay" style="color:#48bb78; font-weight:bold; cursor:pointer;" onclick="copyToClipboard(this.textContent)">Click to copy</span></p>
                     <p style="color:#4a5568; font-size:13px;">📌 Redirecting to: <span id="redirectUrlDisplay" style="color:#667eea; word-break:break-all;"></span></p>
                 </div>
             </div>

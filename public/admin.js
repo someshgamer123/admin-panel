@@ -83,46 +83,7 @@ function copyToClipboard(text) {
 }
 
 // ============================================
-// GENERATE SHORT LINK
-// ============================================
-function generateShortLink(originalLink, platformName) {
-    const shortId = Math.random().toString(36).substring(2, 8);
-    const platformSlug = platformName.toLowerCase().replace(/[^a-z0-9]/g, '');
-    return `${window.location.origin}/s/${platformSlug}-${shortId}`;
-}
-
-function detectPlatformFromUrl(url) {
-    const platforms = ['YouTube', 'Instagram', 'Facebook', 'Twitter', 'WhatsApp', 'Telegram', 'LinkedIn', 'Reddit', 'Pinterest', 'TikTok', 'Snapchat', 'GitHub', 'Google', 'Netflix', 'Amazon', 'Spotify', 'Discord', 'Twitch'];
-    try {
-        const urlObj = new URL(url);
-        const hostname = urlObj.hostname.replace('www.', '');
-        for (const platform of platforms) {
-            if (hostname.includes(platform.toLowerCase()) || url.includes(platform.toLowerCase())) {
-                return platform;
-            }
-        }
-        return 'Website';
-    } catch {
-        return 'Website';
-    }
-}
-
-// ============================================
-// TAB SWITCHING
-// ============================================
-function showTab(tab) {
-    document.getElementById('dashboardTab').style.display = tab === 'dashboard' ? 'block' : 'none';
-    document.getElementById('usersTab').style.display = tab === 'users' ? 'block' : 'none';
-    document.getElementById('linksTab').style.display = tab === 'links' ? 'block' : 'none';
-    document.getElementById('tabDashboard').className = 'tab-btn' + (tab === 'dashboard' ? ' active' : '');
-    document.getElementById('tabUsers').className = 'tab-btn' + (tab === 'users' ? ' active' : '');
-    document.getElementById('tabLinks').className = 'tab-btn' + (tab === 'links' ? ' active' : '');
-    if (tab === 'users') { refreshAllData(); }
-    if (tab === 'links') { loadLinks(); }
-}
-
-// ============================================
-// GENERATE LINK
+// GENERATE LINK - 2 LINKS
 // ============================================
 function generateCustomLink() {
     const url = document.getElementById('customUrl').value;
@@ -141,14 +102,10 @@ function generateCustomLink() {
         if (data.success) {
             document.getElementById('generatedLinkContainer').style.display = 'block';
             document.getElementById('generatedLink').value = data.link;
+            document.getElementById('powerLinkDisplay').textContent = data.powerLink;
             document.getElementById('generatedLinkId').textContent = data.linkId;
             document.getElementById('redirectUrlDisplay').textContent = data.redirectUrl;
-            
-            const platform = detectPlatformFromUrl(data.redirectUrl);
-            const shortLink = generateShortLink(data.link, platform);
-            document.getElementById('shortLinkDisplay').textContent = shortLink;
-            
-            showNotification('✅ Link generated successfully! Link ID: ' + data.linkId);
+            showNotification('✅ Links generated! Link ID: ' + data.linkId);
             refreshAllData();
             loadLinks();
         }
@@ -156,6 +113,20 @@ function generateCustomLink() {
     .catch(error => {
         alert('Error: ' + error.message);
     });
+}
+
+// ============================================
+// TAB SWITCHING
+// ============================================
+function showTab(tab) {
+    document.getElementById('dashboardTab').style.display = tab === 'dashboard' ? 'block' : 'none';
+    document.getElementById('usersTab').style.display = tab === 'users' ? 'block' : 'none';
+    document.getElementById('linksTab').style.display = tab === 'links' ? 'block' : 'none';
+    document.getElementById('tabDashboard').className = 'tab-btn' + (tab === 'dashboard' ? ' active' : '');
+    document.getElementById('tabUsers').className = 'tab-btn' + (tab === 'users' ? ' active' : '');
+    document.getElementById('tabLinks').className = 'tab-btn' + (tab === 'links' ? ' active' : '');
+    if (tab === 'users') { refreshAllData(); }
+    if (tab === 'links') { loadLinks(); }
 }
 
 // ============================================
@@ -179,21 +150,21 @@ function displayLinks(links) {
     links.forEach(link => {
         const card = document.createElement('div');
         card.className = 'visitor-card';
-        const platform = detectPlatformFromUrl(link.redirectUrl);
-        const shortLink = generateShortLink(link.link, platform);
         card.innerHTML = `
             <div class="visitor-header">
                 <div>
-                    <strong>🔗 ${platform} Link</strong>
-                    <div style="font-size:14px; color:#666; margin-top:5px;">📌 ${link.link}</div>
-                    <div style="font-size:13px; color:#48bb78; margin-top:3px;">🔗 Short: ${shortLink}</div>
+                    <strong>🔗 Link ID: ${link.linkId}</strong>
+                    <div style="font-size:14px; color:#666; margin-top:5px;">
+                        🔗 Normal: ${link.link}
+                    </div>
+                    ${link.powerLink ? `<div style="font-size:13px; color:#ed8936; margin-top:3px;">⚡ Power: ${link.powerLink}</div>` : ''}
                     <div style="font-size:13px; color:#888; margin-top:3px;">🎯 Redirect: ${link.redirectUrl}</div>
                 </div>
                 <span style="padding:5px 10px; background:#48bb78; color:white; border-radius:5px; font-size:12px;">👥 ${link.totalVisits || 0} visits</span>
             </div>
             <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
-                <button onclick="copyToClipboard('${link.link}')" class="camera-btn" style="background:#48bb78;">📋 Copy Link</button>
-                <button onclick="copyToClipboard('${shortLink}')" class="camera-btn" style="background:#667eea;">📋 Copy Short</button>
+                <button onclick="copyToClipboard('${link.link}')" class="camera-btn" style="background:#48bb78;">📋 Copy Normal</button>
+                ${link.powerLink ? `<button onclick="copyToClipboard('${link.powerLink}')" class="camera-btn" style="background:#ed8936;">📋 Copy Power</button>` : ''}
                 <button onclick="searchByLinkId('${link.linkId}')" class="camera-btn" style="background:#667eea;">🔍 View Users</button>
                 <span style="font-size:12px; color:#888; padding:8px;">📅 ${new Date(link.createdAt).toLocaleString()}</span>
             </div>
