@@ -67,7 +67,7 @@ const writeUsers = (users) => {
 // 5. ROUTES
 // ==========================================
 
-// Check session
+// Check session - NEW
 app.get('/api/check-session', (req, res) => {
     if (req.session.admin) {
         res.json({ authenticated: true });
@@ -88,7 +88,7 @@ app.post('/admin-login', (req, res) => {
     }
 });
 
-// Logout
+// Logout - NEW
 app.post('/logout', (req, res) => {
     req.session.destroy();
     res.json({ success: true });
@@ -236,7 +236,7 @@ app.delete('/api/visitor/:userId/visit/:visitIndex', (req, res) => {
     res.json({ success: true });
 });
 
-// Delete photo
+// Delete photo - NEW
 app.delete('/api/visitor/:userId/photo/:type', (req, res) => {
     if (!req.session.admin) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -286,8 +286,8 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
+// Admin route with session check - UPDATED
 app.get('/admin', (req, res) => {
-    // Check if admin is logged in
     if (req.session.admin) {
         res.sendFile(path.join(__dirname, 'public', 'admin.html'));
     } else {
