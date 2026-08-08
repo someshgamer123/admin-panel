@@ -9,21 +9,33 @@
 <body>
     <div class="login-container">
         <div class="login-box">
-            <div style="text-align:center; margin-bottom:10px;">
-                <span style="font-size:48px;">🔐</span>
+            <div class="login-decoration">
+                <div class="circle c1"></div>
+                <div class="circle c2"></div>
+                <div class="circle c3"></div>
             </div>
+            
+            <div class="login-icon">🔐</div>
             <h2>Admin Panel</h2>
-            <p style="text-align:center; color:rgba(255,255,255,0.4); font-size:14px; margin-bottom:25px;">Enter your credentials to continue</p>
+            <p class="login-subtitle">Enter your credentials to access the dashboard</p>
+            
             <form id="loginForm" autocomplete="off">
                 <div class="input-group">
-                    <input type="email" id="email" placeholder="Email address" required>
+                    <label>📧 Email Address</label>
+                    <input type="email" id="email" placeholder="admin@example.com" required>
                 </div>
                 <div class="input-group">
-                    <input type="password" id="password" placeholder="Password" required>
+                    <label>🔑 Password</label>
+                    <input type="password" id="password" placeholder="Enter your password" required>
                 </div>
                 <button type="submit" class="login-btn">Sign In</button>
             </form>
-            <div id="loginMessage" style="margin-top:15px;"></div>
+            
+            <div id="loginMessage" class="login-message"></div>
+            
+            <div class="login-footer">
+                <p>🔒 Secure • Admin Access Only</p>
+            </div>
         </div>
     </div>
     <script src="script.js"></script>

