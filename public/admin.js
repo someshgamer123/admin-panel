@@ -9,8 +9,21 @@ let currentSort = 'newest';
 // ============================================
 function toggleMenu() {
     const menu = document.getElementById('sideMenu');
+    const overlay = document.getElementById('menuOverlay');
     menu.classList.toggle('open');
+    overlay.classList.toggle('active');
+    document.body.style.overflow = menu.classList.contains('open') ? 'hidden' : '';
 }
+
+// Close menu on escape
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        const menu = document.getElementById('sideMenu');
+        if (menu.classList.contains('open')) {
+            toggleMenu();
+        }
+    }
+});
 
 // ============================================
 // SOCKET CONNECTION
@@ -613,8 +626,13 @@ function showTab(tab) {
     const menuItem = document.getElementById(menuMap[tab]);
     if (menuItem) menuItem.classList.add('active');
     
+    // Close menu on mobile
     if (window.innerWidth <= 768) {
-        document.getElementById('sideMenu').classList.remove('open');
+        const menu = document.getElementById('sideMenu');
+        const overlay = document.getElementById('menuOverlay');
+        menu.classList.remove('open');
+        overlay.classList.remove('active');
+        document.body.style.overflow = '';
     }
     
     if (tab === 'users') { refreshAllData(); }
