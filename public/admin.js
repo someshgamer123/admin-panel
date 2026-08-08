@@ -56,7 +56,6 @@ function loadAllData() {
     .catch(() => {
         window.location.href = '/';
     });
-}
 
 socket.on('visitor-connected', () => {
     refreshAllData();
@@ -191,8 +190,9 @@ function displayPublishers(publishers) {
                     <div style="font-size:12px; color:#888;">📅 ${new Date(p.createdAt).toLocaleString()}</div>
                     <div style="font-size:12px; color:#888;">🔑 Password: ${p.password}</div>
                     <div style="font-size:12px; color:${statusColor};">${statusText}</div>
+                    <div style="font-size:12px; color:#888;">👥 Publisher Visitors: ${(p.users || []).length}</div>
                 </div>
-                <span style="padding:5px 10px; background:#9f7aea; color:white; border-radius:5px; font-size:12px;">👥 ${p.totalVisits || 0} visits</span>
+                <span style="padding:5px 10px; background:#9f7aea; color:white; border-radius:5px; font-size:12px;">📢 Publisher</span>
             </div>
             <div style="display:flex; gap:8px; margin-top:10px; flex-wrap:wrap;">
                 <button onclick="copyToClipboard('${p.link}')" class="camera-btn" style="background:#9f7aea;">📋 Copy</button>
